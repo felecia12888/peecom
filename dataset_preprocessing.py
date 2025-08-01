@@ -19,14 +19,6 @@ Usage:
     python dataset_preprocessing.py --dataset cmohs --config src/config/config.yaml
 """
 
-from src.loader.data_loader import PEECOMDataLoader, load_all_sensor_data, load_profile
-from src.loader.sensor_validation import (
-    apply_sensor_corrections,
-    monitor_sensor_health,
-    AdvancedSensorValidator
-)
-from src.loader.dataset_checker import analyze_dataset
-from src.loader.data_pipeline import EnhancedDataPipelineProcessor
 import os
 import sys
 import argparse
@@ -41,6 +33,68 @@ import yaml
 
 # Add src to path for imports
 sys.path.append(os.path.join(os.path.dirname(__file__), 'src'))
+
+
+def create_preprocessing_parser() -> argparse.ArgumentParser:
+    """Create argument parser for preprocessing script"""
+    parser = argparse.ArgumentParser(
+        description="PEECOM Dataset Preprocessing Script"
+    )
+
+    parser.add_argument(
+        '--dataset', type=str, default='cmohs',
+        help='Dataset name (default: cmohs)'
+    )
+
+    parser.add_argument(
+        '--config', type=str, default='src/config/config.yaml',
+        help='Configuration file path'
+    )
+
+    parser.add_argument(
+        '--output-dir', type=str, default='output',
+        help='Output directory for processed data'
+    )
+
+    parser.add_argument(
+        '--log-level', type=str, default='INFO',
+        choices=['DEBUG', 'INFO', 'WARNING', 'ERROR'],
+        help='Logging level'
+    )
+
+    parser.add_argument(
+        '--run-analysis', action='store_true',
+        help='Run dataset analysis before preprocessing'
+    )
+
+    parser.add_argument(
+        '--enforce-split', action='store_true',
+        help='Split data into train/val/test sets'
+    )
+
+    parser.add_argument(
+        '--train-split', type=float, default=0.7,
+        help='Training set split ratio (default: 0.7)'
+    )
+
+    parser.add_argument(
+        '--val-split', type=float, default=0.15,
+        help='Validation set split ratio (default: 0.15)'
+    )
+
+    parser.add_argument(
+        '--test-split', type=float, default=0.15,
+        help='Test set split ratio (default: 0.15)'
+    )
+
+    parser.add_argument(
+        '--ps4-correction-method', type=str, default='ensemble',
+        choices=['correlation', 'ml_imputation',
+                 'temporal', 'physical', 'ensemble'],
+        help='PS4 correction method to use (default: ensemble)'
+    )
+
+    return parser
 
 
 def setup_output_directories(base_output_dir: str) -> Dict[str, str]:
@@ -110,11 +164,13 @@ def extract_features_from_sensors(data: Dict[str, np.ndarray], config: Dict) -> 
     Returns:
         DataFrame with extracted features
     """
+    from tqdm import tqdm
+
     features = {}
     feature_config = config.get('preprocessing', {}).get(
         'feature_extraction', {})
 
-    for sensor_name, sensor_data in data.items():
+    for sensor_name, sensor_data in tqdm(data.items(), desc="Extracting features", unit="sensor"):
         sensor_type = sensor_name[:2]  # PS, TS, FS, etc.
 
         if sensor_type == 'PS':  # Pressure sensors (100Hz)
@@ -231,6 +287,8 @@ def load_sensor_data_by_type(dataset_dir: str) -> Dict[str, np.ndarray]:
     Returns:
         Dictionary of sensor data arrays
     """
+    from tqdm import tqdm
+
     sensor_data = {}
 
     # Define sensor files
@@ -244,7 +302,8 @@ def load_sensor_data_by_type(dataset_dir: str) -> Dict[str, np.ndarray]:
         'CE': 'CE.txt', 'CP': 'CP.txt', 'SE': 'SE.txt'
     }
 
-    for sensor_name, filename in sensor_files.items():
+    # Add progress bar for loading sensors
+    for sensor_name, filename in tqdm(sensor_files.items(), desc="Loading sensors", unit="sensor"):
         filepath = os.path.join(dataset_dir, filename)
         if os.path.exists(filepath):
             try:
@@ -260,40 +319,123 @@ def load_sensor_data_by_type(dataset_dir: str) -> Dict[str, np.ndarray]:
     return sensor_data
 
 
-def apply_sensor_corrections(sensor_data: Dict[str, np.ndarray], config: Dict) -> Dict[str, np.ndarray]:
+def apply_sensor_corrections(sensor_data: Dict[str, np.ndarray], config: Dict,
+                             correction_method: str = 'ensemble') -> Dict[str, np.ndarray]:
     """
-    Apply sensor corrections, especially for PS4.
+    Apply sensor corrections, especially for PS4 using advanced algorithms.
 
     Args:
         sensor_data: Dictionary of sensor data
         config: Configuration dictionary
+        correction_method: PS4 correction method ('ensemble', 'correlation', 'ml_imputation', etc.)
 
     Returns:
         Corrected sensor data
     """
     corrected_data = sensor_data.copy()
 
-    # PS4 correction using PS3 and PS5
-    if config.get('preprocessing', {}).get('sensor_correction', {}).get('ps4_correction', False):
-        if all(sensor in sensor_data for sensor in ['PS3', 'PS4', 'PS5']):
-            ps3_data = sensor_data['PS3']
-            ps4_data = sensor_data['PS4']
-            ps5_data = sensor_data['PS5']
+    # PS4 correction using advanced algorithms
+    ps4_config = config.get('preprocessing', {}).get(
+        'sensor_correction', {}).get('PS4', {})
+    if ps4_config.get('enabled', False) and 'PS4' in sensor_data:
+        logger = logging.getLogger("peecom_preprocessing")
+        logger.info(
+            f"Applying advanced PS4 correction using method: {correction_method}")
+        try:
+            # Import PS4 corrector locally to avoid path issues
+            import importlib.util
+            spec = importlib.util.spec_from_file_location(
+                "advanced_ps4_correction",
+                os.path.join(os.path.dirname(__file__), 'scripts',
+                             'preprocessing', 'advanced_ps4_correction.py')
+            )
+            if spec and spec.loader:
+                ps4_module = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(ps4_module)
 
-            # Find zero values in PS4
-            zero_mask = ps4_data == 0
+                # Initialize corrector
+                corrector = ps4_module.AdvancedPS4Corrector()
 
-            if np.any(zero_mask):
-                # Estimate PS4 values using PS3 and PS5
-                estimated_values = 0.48 * ps3_data + 0.74 * ps5_data
-                corrected_ps4 = ps4_data.copy()
-                corrected_ps4[zero_mask] = estimated_values[zero_mask]
+                ps4_data = sensor_data['PS4']
+                reference_sensors = {k: v for k, v in sensor_data.items()
+                                     if k.startswith('PS') and k != 'PS4'}
+
+                # Apply selected correction method
+                if correction_method == 'ensemble':
+                    corrected_ps4, summary = corrector.ensemble_correction(
+                        ps4_data, reference_sensors)
+                elif correction_method == 'correlation':
+                    corrected_ps4, confidence = corrector.method1_correlation_correction(
+                        ps4_data, reference_sensors)
+                elif correction_method == 'ml_imputation':
+                    corrected_ps4, confidence = corrector.method2_ml_imputation(
+                        ps4_data, reference_sensors)
+                elif correction_method == 'temporal':
+                    corrected_ps4, confidence = corrector.method3_temporal_restoration(
+                        ps4_data)
+                elif correction_method == 'physical':
+                    corrected_ps4, confidence = corrector.method4_physical_modeling(
+                        ps4_data, reference_sensors)
+                else:
+                    corrected_ps4 = ps4_data  # No correction
 
                 corrected_data['PS4'] = corrected_ps4
+
+                # Calculate improvement
+                zeros_before = np.sum(ps4_data == 0)
+                zeros_after = np.sum(corrected_ps4 == 0)
                 print(
-                    f"Applied PS4 correction to {np.sum(zero_mask)} zero values")
+                    f"PS4 correction ({correction_method}): {zeros_before} → {zeros_after} zero values")
+
+        except Exception as e:
+            print(
+                f"Warning: Advanced PS4 correction failed, using simple method: {e}")
+            # Fallback to simple correction
+            if all(sensor in sensor_data for sensor in ['PS3', 'PS4', 'PS5']):
+                ps3_data = sensor_data['PS3']
+                ps4_data = sensor_data['PS4']
+                ps5_data = sensor_data['PS5']
+
+                zero_mask = ps4_data == 0
+                if np.any(zero_mask):
+                    estimated_values = 0.48 * ps3_data + 0.74 * ps5_data
+                    corrected_ps4 = ps4_data.copy()
+                    corrected_ps4[zero_mask] = estimated_values[zero_mask]
+                    corrected_data['PS4'] = corrected_ps4
+                    print(
+                        f"Applied simple PS4 correction to {np.sum(zero_mask)} zero values")
 
     return corrected_data
+
+
+def create_preprocessing_parser():
+    """Create argument parser for preprocessing script"""
+    parser = argparse.ArgumentParser(
+        description='PEECOM Dataset Preprocessing')
+    parser.add_argument('--dataset', type=str, default='cmohs',
+                        help='Dataset name (default: cmohs)')
+    parser.add_argument('--config', type=str, default='src/config/config.yaml',
+                        help='Configuration file path')
+    parser.add_argument('--output-dir', type=str, default='output',
+                        help='Output directory')
+    parser.add_argument('--log-level', type=str, default='INFO',
+                        choices=['DEBUG', 'INFO', 'WARNING', 'ERROR'],
+                        help='Logging level')
+    parser.add_argument('--run-analysis', action='store_true',
+                        help='Run dataset analysis before preprocessing')
+    parser.add_argument('--enforce-split', action='store_true',
+                        help='Create train/val/test splits')
+    parser.add_argument('--train-split', type=float, default=0.7,
+                        help='Training split ratio')
+    parser.add_argument('--val-split', type=float, default=0.15,
+                        help='Validation split ratio')
+    parser.add_argument('--test-split', type=float, default=0.15,
+                        help='Test split ratio')
+    parser.add_argument('--ps4-correction-method', type=str, default='ensemble',
+                        choices=['ensemble', 'correlation',
+                                 'ml_imputation', 'temporal', 'physical'],
+                        help='PS4 correction method to use')
+    return parser
 
 
 def create_data_splits(features: pd.DataFrame, targets: pd.DataFrame,
@@ -368,22 +510,12 @@ def save_processed_data(features_splits: Dict[str, pd.DataFrame],
     for split_name, data in features_splits.items():
         filepath = os.path.join(output_dir, f'X_{split_name}.csv')
         data.to_csv(filepath, index=False)
-
-        # Also save as numpy arrays for compatibility
-        np_filepath = os.path.join(output_dir, f'X_{split_name}.npy')
-        np.save(np_filepath, data.values)
-
         print(f"Saved {split_name} features: {data.shape} -> {filepath}")
 
     # Save target data
     for split_name, data in targets_splits.items():
         filepath = os.path.join(output_dir, f'y_{split_name}.csv')
         data.to_csv(filepath, index=False)
-
-        # Also save as numpy arrays for compatibility
-        np_filepath = os.path.join(output_dir, f'y_{split_name}.npy')
-        np.save(np_filepath, data.values)
-
         print(f"Saved {split_name} targets: {data.shape} -> {filepath}")
 
     # Save metadata
@@ -423,12 +555,17 @@ def main():
         dataset_dir = config.get('data', {}).get(
             'dataset_dir', 'dataset/cmohs')
 
-    # Use processed_data subdirectory in output
-    processed_data_dir = output_dirs['processed_data']
+    # Create dataset-specific subdirectory for processed data
+    dataset_name = args.dataset
+    processed_data_dir = os.path.join(
+        output_dirs['processed_data'], dataset_name)
+    os.makedirs(processed_data_dir, exist_ok=True)
 
     logger.info(f"Dataset directory: {dataset_dir}")
     logger.info(f"Output directory: {base_output_dir}")
     logger.info(f"Processed data directory: {processed_data_dir}")
+    logger.info(
+        f"Dataset: {dataset_name} | PS4 Method: {args.ps4_correction_method}")
 
     # Validate dataset directory
     if not os.path.exists(dataset_dir):
@@ -439,6 +576,8 @@ def main():
     if args.run_analysis:
         logger.info("Running dataset analysis...")
         try:
+            # Import analyze_dataset here to avoid complex import chain
+            from src.loader.dataset_checker import analyze_dataset
             # Update analysis output to use output directory
             analysis_results = analyze_dataset(dataset_dir)
             # Move analysis results to output directory
@@ -471,7 +610,8 @@ def main():
 
     # Apply sensor corrections
     logger.info("Applying sensor corrections...")
-    sensor_data = apply_sensor_corrections(sensor_data, config)
+    sensor_data = apply_sensor_corrections(
+        sensor_data, config, args.ps4_correction_method)
 
     # Extract features
     logger.info("Extracting features from sensor data...")
@@ -509,8 +649,11 @@ def main():
     # Prepare metadata
     metadata = {
         'preprocessing_timestamp': datetime.now().isoformat(),
+        'dataset_name': dataset_name,
+        'ps4_correction_method': args.ps4_correction_method,
         'dataset_dir': dataset_dir,
-        'output_dir': output_dir,
+        'output_dir': base_output_dir,
+        'processed_data_dir': processed_data_dir,
         'original_samples': len(features),
         'feature_columns': list(features.columns),
         'target_columns': list(targets.columns),
@@ -519,6 +662,7 @@ def main():
         },
         'sensor_corrections_applied': config.get('preprocessing', {}).get('sensor_correction', {}),
         'feature_extraction_config': config.get('preprocessing', {}).get('feature_extraction', {}),
+        'ps4_correction_method': args.ps4_correction_method,
         'command_line_args': vars(args)
     }    # Save processed data
     logger.info("Saving processed data...")
@@ -550,6 +694,61 @@ def main():
             f"Feature extraction config: {config.get('preprocessing', {}).get('feature_extraction', {})}\n")
 
     logger.info(f"Processing report saved to: {report_path}")
+
+    # Create run summary in the dataset directory
+    run_summary_path = os.path.join(processed_data_dir, 'run_summary.txt')
+    with open(run_summary_path, 'w') as f:
+        f.write(
+            f"PEECOM {dataset_name.upper()} DATASET - FINAL PROCESSED DATA\n")
+        f.write("="*60 + "\n\n")
+        f.write(
+            f"Processing Date: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+        f.write(f"Dataset: {dataset_name}\n")
+        f.write(f"PS4 Correction Method: {args.ps4_correction_method}\n")
+        f.write(f"Total Samples: {len(features)}\n")
+        f.write(f"Features Extracted: {len(features.columns)}\n")
+        f.write(f"Target Variables: {len(targets.columns)}\n\n")
+
+        f.write("FILES AVAILABLE:\n")
+        f.write("- X_full.csv       (Features in CSV format)\n")
+        f.write("- X_full.npy       (Features in NumPy format)\n")
+        f.write("- y_full.csv       (Targets in CSV format)\n")
+        f.write("- y_full.npy       (Targets in NumPy format)\n")
+        f.write("- metadata.json    (Processing metadata)\n")
+        f.write("- run_summary.txt  (This summary)\n\n")
+
+        f.write("READY FOR MODEL TRAINING! 🚀\n")
+        f.write("Use this directory for all training scripts.\n")
+
+    logger.info(f"Run summary saved to: {run_summary_path}")
+
+    # Create run summary in main processed_data directory for easy reference
+    run_summary_path = os.path.join(
+        output_dirs['processed_data'], 'latest_run_summary.txt')
+    with open(run_summary_path, 'w') as f:
+        f.write("LATEST PEECOM PREPROCESSING RUN SUMMARY\n")
+        f.write("="*50 + "\n\n")
+        f.write(f"Dataset: {dataset_name}\n")
+        f.write(f"PS4 Correction Method: {args.ps4_correction_method}\n")
+        f.write(f"Timestamp: {datetime.now().isoformat()}\n")
+        f.write(f"Dataset: {args.dataset}\n")
+        f.write(f"PS4 Correction Method: {args.ps4_correction_method}\n")
+        f.write(f"Data Location: {processed_data_dir}\n\n")
+        f.write(f"Samples: {len(features)}\n")
+        f.write(f"Features: {len(features.columns)}\n")
+        f.write(f"Targets: {len(targets.columns)}\n\n")
+        f.write("Files Generated:\n")
+        f.write(
+            f"  - X_full.csv ({len(features)} samples x {len(features.columns)} features)\n")
+        f.write(
+            f"  - y_full.csv ({len(targets)} samples x {len(targets.columns)} targets)\n")
+        f.write(f"  - metadata.json (processing metadata)\n\n")
+        f.write("Next Steps:\n")
+        f.write("  1. Run analysis script to verify PS4 correction\n")
+        f.write("  2. Use this data for model training\n")
+        f.write("  3. Compare results with previous runs\n")
+
+    logger.info(f"Run summary saved to: {run_summary_path}")
     logger.info("Preprocessing completed successfully!")
     logger.info(f"All outputs saved to: {base_output_dir}")
 

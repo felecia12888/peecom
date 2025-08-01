@@ -96,7 +96,7 @@ def run_preprocessing(dataset_path, output_dir, iteration, logger):
     logger.info(f"Running preprocessing iteration {iteration}...")
 
     cmd = [
-        sys.executable, "enhanced_preprocessing.py",
+        sys.executable, "scripts/preprocessing/enhanced_preprocessing.py",
         "--dataset", dataset_path,
         "--output", output_dir,
         "--iteration", str(iteration)

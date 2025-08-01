@@ -126,11 +126,12 @@ preprocessing:
     # PS4 specific correction (critical)
     PS4:
       enabled: true
-      correction_method: "multi_sensor_correlation"
-      reference_sensors: ["PS1", "PS5", "PS6"]
+      correction_method: "advanced_ensemble"
+      reference_sensors: ["PS1", "PS3", "PS5", "PS6"]
       correlation_threshold: 0.8
-      interpolation_method: "linear"
+      interpolation_method: "cubic"
       validate_corrections: true
+      advanced_methods: ["correlation", "ml_imputation", "temporal", "physical"]
 
     # PS2/PS3 calibration correction
     pressure_calibration:

@@ -7,7 +7,7 @@ This module contains all dataset loading, preprocessing, and data pipeline funct
 from .data_loader import load_all_sensor_data, PEECOMDataLoader
 from .preprocessor import PEECOMDataProcessor, create_sequences
 from .data_pipeline import DataPipelineProcessor
-from .sensor_validation import SensorValidator
+from .sensor_validation import AdvancedSensorValidator
 from .sensor_monitor import SensorMonitor
 
 __all__ = [
@@ -16,6 +16,6 @@ __all__ = [
     'PEECOMDataProcessor',
     'create_sequences',
     'DataPipelineProcessor',
-    'SensorValidator',
+    'AdvancedSensorValidator',
     'SensorMonitor'
 ]
