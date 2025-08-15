@@ -41,6 +41,8 @@ def main():
                         help='Output directory for model and results')
     parser.add_argument('--eval-all', action='store_true',
                         help='Evaluate all available targets')
+    parser.add_argument('--visualize', action='store_true',
+                        help='Generate visualizations after training')
     parser.add_argument('--list-models', action='store_true',
                         help='List all available models and exit')
     parser.add_argument('--verbose', action='store_true',
@@ -104,6 +106,40 @@ def main():
             print(
                 f"CV score: {results['cv_mean']:.4f} (+/- {results['cv_std'] * 2:.4f})")
         print(f"Results saved to: {args.output}")
+
+        # Generate visualizations if requested
+        if args.visualize:
+            print("\n" + "="*60)
+            print("GENERATING VISUALIZATIONS...")
+            print("="*60)
+            try:
+                # Import visualization system
+                from visualize_models import PeecomVisualizationSystem
+
+                viz_system = PeecomVisualizationSystem(
+                    base_output_dir='output')
+
+                if args.eval_all:
+                    print(
+                        f"Generating comprehensive visualizations for {args.model}...")
+                    viz_system.visualize_model_all_targets(args.model)
+                else:
+                    print(
+                        f"Generating visualizations for {args.model} → {args.target}...")
+                    viz_system.visualize_model_target(args.model, args.target)
+
+                print("✅ VISUALIZATION GENERATION COMPLETED!")
+
+            except Exception as viz_error:
+                print(f"⚠️  Visualization generation failed: {viz_error}")
+                print(
+                    "Model training was successful. You can generate visualizations manually using:")
+                if args.eval_all:
+                    print(
+                        f"python visualize_models.py --model {args.model} --eval-all")
+                else:
+                    print(
+                        f"python visualize_models.py --model {args.model} --target {args.target}")
 
         return 0
 

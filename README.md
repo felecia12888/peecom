@@ -444,6 +444,128 @@ predictions = model.predict(X_scaled)
 
 ---
 
+## 📊 Model Visualization & Analysis
+
+### **🎨 Advanced Visualization System**
+
+PEECOM includes a comprehensive visualization system that generates publication-quality individual plots for in-depth model analysis and insights.
+
+**Available Visualization Types:**
+
+- **Feature Importance Analysis** - Individual plots for each model showing top features
+- **PEECOM Physics Analysis** - Physics-enhanced feature insights (4 separate plots)
+- **Model Complexity Comparison** - Training time, storage, and feature complexity
+- **Performance Analysis** - Accuracy, precision, recall across targets
+- **Data Analysis** - Sensor patterns, correlations, and distributions
+
+### **🖼️ Visualization Commands**
+
+#### **Single Model-Target Visualization**
+
+```bash
+# Generate plots for Random Forest on cooler condition
+python visualize_models.py --model random_forest --target cooler_condition
+
+# Generate plots for PEECOM model on valve condition
+python visualize_models.py --model peecom --target valve_condition
+
+# Generate plots for Logistic Regression on pump leakage
+python visualize_models.py --model logistic_regression --target pump_leakage
+
+# Generate plots for SVM on accumulator pressure
+python visualize_models.py --model svm --target accumulator_pressure
+
+# Generate plots for any model on stability flag
+python visualize_models.py --model random_forest --target stable_flag
+```
+
+#### **Visualize All Targets (Model-Specific)**
+
+```bash
+# Generate visualizations for Random Forest on all targets
+python visualize_models.py --model random_forest --eval-all
+
+# Generate visualizations for PEECOM on all targets
+python visualize_models.py --model peecom --eval-all
+
+# Generate visualizations for Logistic Regression on all targets
+python visualize_models.py --model logistic_regression --eval-all
+
+# Generate visualizations for SVM on all targets
+python visualize_models.py --model svm --eval-all
+```
+
+#### **Comprehensive Analysis**
+
+```bash
+# Generate all data analysis plots
+python visualize_models.py --generate-all-data-plots
+
+# Generate complete comprehensive analysis (all models, all targets)
+python visualize_models.py --generate-all
+
+# List available models and targets
+python visualize_models.py --list-models
+python visualize_models.py --list-targets
+```
+
+### **📁 Generated Visualization Structure**
+
+Each visualization command creates organized output:
+
+```
+output/models/{model_name}/{target_name}/figures/
+├── {model_name}_{target}_feature_importance.pdf/.png     # Feature rankings
+├── peecom_{target}_physics_vs_standard.pdf/.png          # Physics comparison (PEECOM only)
+├── peecom_{target}_top_physics_features.pdf/.png         # Top physics features
+├── peecom_{target}_feature_distribution.pdf/.png         # Feature categories
+├── peecom_{target}_physics_impact.pdf/.png              # Performance impact
+├── model_feature_complexity_comparison.pdf/.png          # Model complexity
+├── model_training_complexity_comparison.pdf/.png         # Training time
+├── model_storage_complexity_comparison.pdf/.png          # Storage size
+└── visualization_summary.json                           # Generation summary
+```
+
+### **🔬 PEECOM Physics Visualizations**
+
+The PEECOM model generates **4 individual physics analysis plots**:
+
+1. **Physics vs Standard Features** - Average importance comparison
+2. **Top Physics Features** - Ranked physics-enhanced features
+3. **Feature Distribution** - Pie chart of feature categories
+4. **Physics Impact** - Performance improvement from physics features
+
+**Example PEECOM Physics Features Visualized:**
+
+- `hydraulic_power_PS1_mean_FS1_mean`
+- `pressure_diff_PS2_skew_PS2_kurtosis`
+- `thermal_efficiency_TS4_mean_EPS1_energy`
+- `pressure_ratio_PS1_PS2`
+
+### **📈 Visualization Features**
+
+- ✅ **Individual Plots** - No combined subplots, each insight gets its own figure
+- ✅ **Publication Quality** - High-resolution PDF and PNG formats
+- ✅ **Model-Specific** - Tailored visualizations for each algorithm
+- ✅ **Physics Integration** - Special analysis for PEECOM's physics features
+- ✅ **Comprehensive Coverage** - All 4 models × 5 targets supported
+- ✅ **Automated Generation** - Batch processing with `--eval-all`
+
+### **🎯 Quick Visualization Examples**
+
+```bash
+# Quick start: Visualize best-performing PEECOM model
+python visualize_models.py --model peecom --eval-all
+
+# Compare all models on critical cooler condition
+python visualize_models.py --model all --target cooler_condition
+
+# Generate everything for comprehensive analysis
+python visualize_models.py --generate-all
+```
+
+---
+
 ## 📊 Model Training Ready
 
 The processed dataset in `output/processed_data/cmohs/` is ready for:
