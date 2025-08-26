@@ -182,8 +182,9 @@ class PEECOMModel(BaseEstimator, ClassifierMixin):
             }
             self.models['xgboost'] = xgb.XGBClassifier(**xgb_params)
             print("XGBoost added to ensemble for superior performance")
-        except ImportError:
-            print("XGBoost not available, using standard ensemble")
+        except (ImportError, Exception) as e:
+            print(f"XGBoost not available: {str(e)[:100]}...")
+            print("Using standard ensemble (RandomForest + GradientBoosting)")
 
     def _select_physics_features_intelligently(self, X_engineered, y):
         """
