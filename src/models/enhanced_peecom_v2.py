@@ -23,10 +23,13 @@ import warnings
 warnings.filterwarnings('ignore')
 
 # Try to import XGBoost for maximum performance
+XGBOOST_AVAILABLE = False
 try:
     import xgboost as xgb
     XGBOOST_AVAILABLE = True
-except ImportError:
+    print("XGBoost available - maximum performance mode enabled")
+except (ImportError, OSError, Exception) as e:
+    print(f"XGBoost not available: {str(e)[:100]}...")
     XGBOOST_AVAILABLE = False
 
 # Try to import LightGBM with comprehensive error handling
@@ -34,16 +37,16 @@ LIGHTGBM_AVAILABLE = False
 try:
     import lightgbm as lgb
     LIGHTGBM_AVAILABLE = True
-except ImportError:
-    pass
-except OSError as e:
-    # Handle macOS dylib issues
-    if "libomp" in str(e):
-        print("Warning: LightGBM not available due to OpenMP library issues. Using standard ensemble.")
-    else:
-        print(f"Warning: LightGBM not available: {e}")
-except Exception as e:
-    print(f"Warning: LightGBM not available: {e}")
+    print("LightGBM available - enhanced performance mode enabled")
+except (ImportError, OSError, Exception) as e:
+    print(f"LightGBM not available: {str(e)[:100]}...")
+    LIGHTGBM_AVAILABLE = False
+
+print(f"Enhanced PEECOM v2.0 initialized with:")
+print(f"  - XGBoost: {'Available' if XGBOOST_AVAILABLE else 'Not Available'}")
+print(
+    f"  - LightGBM: {'Available' if LIGHTGBM_AVAILABLE else 'Not Available'}")
+print(f"  - Fallback: RandomForest + GradientBoosting ensemble")
 
 
 class EnhancedPEECOMv2(BaseEstimator, ClassifierMixin):
