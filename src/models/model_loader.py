@@ -8,6 +8,7 @@ can be accessed by name.
 """
 
 from .peecom_model import PEECOMModel
+from .enhanced_peecom_v2 import EnhancedPEECOMv2
 from .gradient_boosting_model import GradientBoostingModel
 from .svm_model import SVMModel
 from .logistic_regression_model import LogisticRegressionModel
@@ -79,6 +80,14 @@ class ModelLoader:
                 'suitable_for': ['hydraulic_systems', 'physics_aware', 'anomaly_detection', 'condition_monitoring'],
                 'pros': ['Domain knowledge integration', 'Physics-inspired features', 'Balanced learning', 'System insights'],
                 'cons': ['Domain-specific', 'More complex feature engineering', 'Longer processing time']
+            },
+            'enhanced_peecom_v2': {
+                'class': EnhancedPEECOMv2,
+                'display_name': 'Enhanced PEECOM v2.0 (Superior Performance)',
+                'description': 'Advanced PEECOM with expert feature engineering, XGBoost ensemble, and intelligent optimization',
+                'suitable_for': ['maximum_performance', 'hydraulic_systems', 'competitive_benchmarking', 'production_deployment'],
+                'pros': ['Maximum accuracy', 'Expert feature engineering', 'Advanced ensemble methods', 'Intelligent optimization', 'Uncertainty quantification'],
+                'cons': ['Higher computational cost', 'More dependencies', 'Complex model']
             }
         }
         return models
