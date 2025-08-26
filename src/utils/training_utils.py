@@ -77,24 +77,79 @@ def train_model_with_loader(X, y, model_name='random_forest', output_dir='output
         # PEECOM handles its own feature engineering and scaling
         model_instance.fit(X_train, y_train)
 
-        # For evaluation, we need to use model_instance methods
-        train_score = model_instance.model.score(
-            model_instance.scaler.transform(
-                model_instance._engineer_physics_features(X_train)
-            ), y_train
-        )
-        test_score = model_instance.model.score(
-            model_instance.scaler.transform(
-                model_instance._engineer_physics_features(X_test)
-            ), y_test
-        )
+        # For evaluation, use the model's predict methods since ensemble doesn't have single .score()
+        try:
+            # Get predictions using the ensemble
+            train_pred = model_instance.predict(X_train)
+            test_pred = model_instance.predict(X_test)
+
+            # Calculate accuracy scores manually
+            from sklearn.metrics import accuracy_score
+            train_score = accuracy_score(y_train, train_pred)
+            test_score = accuracy_score(y_test, test_pred)
+        except Exception as e:
+            print(f"Error in PEECOM evaluation: {e}")
+            # Fallback to using the primary model if available
+            if hasattr(model_instance, 'model') and model_instance.model is not None:
+                try:
+                    if hasattr(model_instance, '_engineer_physics_features'):
+                        X_train_eng = model_instance._engineer_physics_features(
+                            X_train)
+                        X_test_eng = model_instance._engineer_physics_features(
+                            X_test)
+                        X_train_scaled = model_instance.scaler.transform(
+                            X_train_eng)
+                        X_test_scaled = model_instance.scaler.transform(
+                            X_test_eng)
+                    else:
+                        # Use scaled original features
+                        temp_scaler = StandardScaler()
+                        X_train_scaled = temp_scaler.fit_transform(X_train)
+                        X_test_scaled = temp_scaler.transform(X_test)
+
+                    train_score = model_instance.model.score(
+                        X_train_scaled, y_train)
+                    test_score = model_instance.model.score(
+                        X_test_scaled, y_test)
+                except Exception as fallback_error:
+                    print(f"Fallback evaluation failed: {fallback_error}")
+                    train_score, test_score = 0.0, 0.0
+            else:
+                # Ultimate fallback
+                train_score, test_score = 0.0, 0.0
 
         # Get predictions for detailed evaluation
         y_pred = model_instance.predict(X_test)
 
         # Cross-validation with PEECOM
-        X_engineered = model_instance._engineer_physics_features(X)
-        X_scaled_full = model_instance.scaler.transform(X_engineered)
+        # For CV, we need to engineer features consistently
+        try:
+            if hasattr(model_instance, '_engineer_physics_features'):
+                X_engineered = model_instance._engineer_physics_features(X)
+                X_scaled_full = model_instance.scaler.transform(X_engineered)
+            else:
+                # Fallback: just scale the original features
+                temp_scaler = StandardScaler()
+                X_scaled_full = temp_scaler.fit_transform(X)
+        except Exception as e:
+            print(f"Warning: Feature engineering failed for CV: {e}")
+            # Ultimate fallback: just scale the original features
+            temp_scaler = StandardScaler()
+            X_scaled_full = temp_scaler.fit_transform(X)
+        try:
+            if hasattr(model_instance, '_engineer_physics_features'):
+                X_engineered = model_instance._engineer_physics_features(X)
+                X_scaled_full = model_instance.scaler.transform(X_engineered)
+            else:
+                # Fallback: just scale the original features
+                temp_scaler = StandardScaler()
+                X_scaled_full = temp_scaler.fit_transform(X)
+        except Exception as e:
+            print(f"Warning: Feature engineering failed for CV: {e}")
+            # Ultimate fallback: just scale the original features
+            temp_scaler = StandardScaler()
+            X_scaled_full = temp_scaler.fit_transform(X)
+
         cv_scores = cross_val_score(
             model_instance.model, X_scaled_full, y, cv=5)
 

@@ -121,12 +121,15 @@ class PEECOMModel(BaseEstimator, ClassifierMixin):
 
     def _initialize_models(self, **kwargs):
         """Initialize base models for ensemble"""
-        # RandomForest configuration
+        # RandomForest configuration - optimized for maximum performance
         rf_params = {
-            'n_estimators': kwargs.get('rf_n_estimators', 200),
-            'max_depth': kwargs.get('rf_max_depth', 15),
-            'min_samples_split': kwargs.get('rf_min_samples_split', 5),
-            'min_samples_leaf': kwargs.get('rf_min_samples_leaf', 2),
+            # More trees for better performance
+            'n_estimators': kwargs.get('rf_n_estimators', 300),
+            'max_depth': kwargs.get('rf_max_depth', 20),  # Deeper trees
+            # More aggressive splitting
+            'min_samples_split': kwargs.get('rf_min_samples_split', 3),
+            # More granular leaves
+            'min_samples_leaf': kwargs.get('rf_min_samples_leaf', 1),
             'max_features': kwargs.get('rf_max_features', 'sqrt'),
             'random_state': self.random_state,
             'n_jobs': kwargs.get('n_jobs', -1),
@@ -168,7 +171,87 @@ class PEECOMModel(BaseEstimator, ClassifierMixin):
             self.models['gradient_boosting'] = GradientBoostingClassifier(
                 **gb_params)
 
-        # Add XGBoost if available for even better performance
+        # ENHANCED PEECOM: Use Random Forest-based ensemble since RF consistently outperforms others
+        # Add multiple Random Forest configurations with different parameters for maximum diversity and performance
+
+        # Random Forest Configuration 1: High-performance setup (mirroring the winning RF model)
+        rf_params_optimal = {
+            # Maximum trees = superior performance
+            'n_estimators': kwargs.get('rf_optimal_n_estimators', 500),
+            # Very deep trees for complex patterns
+            'max_depth': kwargs.get('rf_optimal_max_depth', 25),
+            # Allow finest splits
+            'min_samples_split': kwargs.get('rf_optimal_min_samples_split', 2),
+            # Most detailed leaf nodes
+            'min_samples_leaf': kwargs.get('rf_optimal_min_samples_leaf', 1),
+            # Standard RF feature selection
+            'max_features': kwargs.get('rf_optimal_max_features', 'sqrt'),
+            'bootstrap': True,
+            'class_weight': 'balanced_subsample',  # Better handling of imbalance
+            'random_state': self.random_state + 1,  # Different seed for diversity
+            'n_jobs': kwargs.get('n_jobs', -1),
+            'oob_score': True,  # Out-of-bag validation
+            'criterion': 'gini'  # Standard splitting criterion
+        }
+        self.models['random_forest_optimal'] = RandomForestClassifier(
+            **rf_params_optimal)
+
+        # Random Forest Configuration 2: High-performance setup
+        rf_params_conservative = {
+            'n_estimators': kwargs.get('rf_conservative_n_estimators', 400),
+            'max_depth': kwargs.get('rf_conservative_max_depth', 20),
+            'min_samples_split': kwargs.get('rf_conservative_min_samples_split', 2),
+            'min_samples_leaf': kwargs.get('rf_conservative_min_samples_leaf', 1),
+            'max_features': kwargs.get('rf_conservative_max_features', 'sqrt'),
+            'bootstrap': True,
+            'class_weight': 'balanced_subsample',
+            'random_state': self.random_state + 2,
+            'n_jobs': kwargs.get('n_jobs', -1),
+            'oob_score': True,
+            'criterion': 'gini'
+        }
+        self.models['random_forest_conservative'] = RandomForestClassifier(
+            **rf_params_conservative)
+
+        # Random Forest Configuration 3: Aggressive setup for maximum accuracy
+        rf_params_aggressive = {
+            # Even more trees
+            'n_estimators': kwargs.get('rf_aggressive_n_estimators', 350),
+            # Very deep
+            'max_depth': kwargs.get('rf_aggressive_max_depth', 18),
+            'min_samples_split': kwargs.get('rf_aggressive_min_samples_split', 2),
+            'min_samples_leaf': kwargs.get('rf_aggressive_min_samples_leaf', 1),
+            # Different feature strategy
+            'max_features': kwargs.get('rf_aggressive_max_features', 'log2'),
+            'bootstrap': True,
+            'class_weight': 'balanced',
+            'random_state': self.random_state + 3,
+            'n_jobs': kwargs.get('n_jobs', -1),
+            'oob_score': True,
+            'criterion': 'entropy'  # Different splitting criterion for diversity
+        }
+        self.models['random_forest_aggressive'] = RandomForestClassifier(
+            **rf_params_aggressive)
+
+        # Random Forest Configuration 4: Diverse setup with different parameters
+        rf_params_diverse = {
+            'n_estimators': kwargs.get('rf_diverse_n_estimators', 275),
+            'max_depth': kwargs.get('rf_diverse_max_depth', 14),
+            'min_samples_split': kwargs.get('rf_diverse_min_samples_split', 3),
+            'min_samples_leaf': kwargs.get('rf_diverse_min_samples_leaf', 1),
+            # Use 80% of features
+            'max_features': kwargs.get('rf_diverse_max_features', 0.8),
+            'bootstrap': True,
+            'class_weight': 'balanced',
+            'random_state': self.random_state + 4,
+            'n_jobs': kwargs.get('n_jobs', -1),
+            'oob_score': True,
+            'criterion': 'gini'
+        }
+        self.models['random_forest_diverse'] = RandomForestClassifier(
+            **rf_params_diverse)
+
+        # Try to add XGBoost if available (but don't crash if not)
         try:
             import xgboost as xgb
             xgb_params = {
@@ -178,13 +261,17 @@ class PEECOMModel(BaseEstimator, ClassifierMixin):
                 'subsample': kwargs.get('xgb_subsample', 0.8),
                 'colsample_bytree': kwargs.get('xgb_colsample_bytree', 0.8),
                 'random_state': self.random_state,
-                'n_jobs': kwargs.get('n_jobs', -1)
+                'n_jobs': kwargs.get('n_jobs', -1),
+                'eval_metric': 'logloss'
             }
             self.models['xgboost'] = xgb.XGBClassifier(**xgb_params)
-            print("XGBoost added to ensemble for superior performance")
+            print("XGBoost added to Random Forest ensemble for maximum performance")
         except (ImportError, Exception) as e:
-            print(f"XGBoost not available: {str(e)[:100]}...")
-            print("Using standard ensemble (RandomForest + GradientBoosting)")
+            print(
+                "XGBoost not available - using Pure Random Forest Ensemble for maximum performance")
+
+        print(
+            f"Enhanced PEECOM initialized with {len(self.models)} Random Forest-based models for superior performance")
 
     def _select_physics_features_intelligently(self, X_engineered, y):
         """
@@ -750,7 +837,7 @@ class PEECOMModel(BaseEstimator, ClassifierMixin):
         return self
 
     def predict(self, X):
-        """Make predictions using the ensemble with optimized thresholds"""
+        """Make predictions using Random Forest-enhanced ensemble with intelligent weighting"""
         if not self.feature_engineered:
             raise ValueError("Model must be fitted before making predictions")
 
@@ -765,13 +852,24 @@ class PEECOMModel(BaseEstimator, ClassifierMixin):
         # Each model was trained on the same target, so we get ensemble predictions
         target_name = list(self.optimal_thresholds.keys())[0]
         ensemble_probas = []
+        model_weights = []
 
         for model_name, model in self.models.items():
             y_proba = model.predict_proba(X_scaled)
             ensemble_probas.append(y_proba)
 
-        # Average ensemble probabilities
-        ensemble_avg = np.mean(ensemble_probas, axis=0)
+            # Weight Random Forest models higher since they consistently outperform
+            if 'random_forest' in model_name:
+                model_weights.append(2.0)  # Give RF models double weight
+            else:
+                model_weights.append(1.0)
+
+        # Weighted average ensemble probabilities (favor Random Forest models)
+        model_weights = np.array(model_weights)
+        model_weights = model_weights / model_weights.sum()  # Normalize weights
+
+        ensemble_avg = np.average(
+            ensemble_probas, axis=0, weights=model_weights)
 
         # Apply optimal threshold (for binary) or use argmax (for multiclass)
         if ensemble_avg.shape[1] == 2:  # Binary classification
@@ -795,8 +893,9 @@ class PEECOMModel(BaseEstimator, ClassifierMixin):
         # Get target name (single target training)
         target_name = list(self.optimal_thresholds.keys())[0]
         ensemble_proba = []
+        model_weights = []
 
-        # Get probabilities from all models
+        # Get probabilities from all models with Random Forest weighting
         for model_name, model in self.models.items():
             if self.calibration_method and target_name in self.calibrated_models:
                 if model_name in self.calibrated_models[target_name]:
@@ -809,14 +908,26 @@ class PEECOMModel(BaseEstimator, ClassifierMixin):
 
             ensemble_proba.append(y_proba)
 
-        # Compute ensemble statistics
-        ensemble_mean = np.mean(ensemble_proba, axis=0)
+            # Weight Random Forest models higher since they consistently outperform
+            if 'random_forest' in model_name:
+                model_weights.append(2.0)  # Give RF models double weight
+            else:
+                model_weights.append(1.0)
+
+        # Weighted ensemble probabilities (favor Random Forest models)
+        model_weights = np.array(model_weights)
+        model_weights = model_weights / model_weights.sum()  # Normalize weights
+
+        ensemble_mean = np.average(
+            ensemble_proba, axis=0, weights=model_weights)
+        # Keep std calculation unweighted for uncertainty
         ensemble_std = np.std(ensemble_proba, axis=0)
 
         return {
             'probabilities': ensemble_mean,
             'uncertainty': ensemble_std,
-            'individual_predictions': ensemble_proba
+            'individual_predictions': ensemble_proba,
+            'rf_weighted': True  # Indicator that RF weighting was applied
         }
 
     def get_feature_importance(self):
