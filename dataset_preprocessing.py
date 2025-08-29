@@ -412,8 +412,19 @@ def create_preprocessing_parser():
     """Create argument parser for preprocessing script"""
     parser = argparse.ArgumentParser(
         description='PEECOM Dataset Preprocessing')
+
+    # Lazy import dataset loader to populate choices
+    try:
+        from src.loader.dataset_loader import dataset_loader
+        dataset_choices = dataset_loader.get_dataset_choices()
+    except Exception:
+        dataset_choices = None
+
     parser.add_argument('--dataset', type=str, default='cmohs',
+                        choices=dataset_choices,
                         help='Dataset name (default: cmohs)')
+    parser.add_argument('--list-datasets', action='store_true',
+                        help='List available datasets and exit')
     parser.add_argument('--config', type=str, default='src/config/config.yaml',
                         help='Configuration file path')
     parser.add_argument('--output-dir', type=str, default='output',
@@ -548,9 +559,27 @@ def main():
         logger.error(f"Error loading config: {e}")
         config = {}
 
-    # Override config with command line arguments
-    if args.dataset:
-        dataset_dir = f"dataset/{args.dataset}"
+    # Resolve dataset directory using the dataset registry
+    try:
+        from src.loader.dataset_loader import dataset_loader
+    except Exception:
+        dataset_loader = None
+
+    if args.list_datasets:
+        if dataset_loader:
+            dataset_loader.list_datasets(verbose=True)
+        else:
+            print('No dataset registry available.')
+        return
+
+    if dataset_loader and args.dataset:
+        try:
+            dataset_dir = dataset_loader.get_dataset_dir(args.dataset)
+        except KeyError:
+            # Fallback to legacy path
+            dataset_dir = os.path.join('dataset', args.dataset)
+    elif args.dataset:
+        dataset_dir = os.path.join('dataset', args.dataset)
     else:
         dataset_dir = config.get('data', {}).get(
             'dataset_dir', 'dataset/cmohs')
