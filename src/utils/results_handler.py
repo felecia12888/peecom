@@ -31,11 +31,27 @@ def _save_json_results(results, output_dir):
     """Save results as JSON file"""
     results_file = output_dir / 'training_results.json'
 
-    # Convert numpy arrays to lists for JSON serialization
+    # Convert numpy arrays and other non-serializable objects to JSON-compatible types
     json_results = {}
     for key, value in results.items():
         if isinstance(value, np.ndarray):
             json_results[key] = value.tolist()
+        elif isinstance(value, dict):
+            # Handle nested dictionaries (like classification_report)
+            json_results[key] = {}
+            for sub_key, sub_value in value.items():
+                if isinstance(sub_value, np.ndarray):
+                    json_results[key][sub_key] = sub_value.tolist()
+                elif isinstance(sub_value, (np.floating, np.integer)):
+                    json_results[key][sub_key] = float(sub_value)
+                elif hasattr(sub_value, 'item'):  # numpy scalar
+                    json_results[key][sub_key] = sub_value.item()
+                else:
+                    json_results[key][sub_key] = sub_value
+        elif isinstance(value, (np.floating, np.integer)):
+            json_results[key] = float(value)
+        elif hasattr(value, 'item'):  # numpy scalar
+            json_results[key] = value.item()
         else:
             json_results[key] = value
 
@@ -50,9 +66,34 @@ def _save_json_results(results, output_dir):
 def _save_feature_importance(results, feature_names, output_dir):
     """Save feature importance as CSV file"""
     if results['feature_importance'] is not None:
+        # Ensure feature_importance is a proper array/list
+        importance_values = results['feature_importance']
+
+        # Handle different data types that might come from the model
+        if isinstance(importance_values, dict):
+            # If it's a dict, extract values in order
+            importance_values = list(importance_values.values())
+        elif hasattr(importance_values, 'tolist'):
+            # Convert numpy arrays to list
+            importance_values = importance_values.tolist()
+        elif not isinstance(importance_values, (list, np.ndarray)):
+            # Convert to list if it's some other iterable
+            importance_values = list(importance_values)
+
+        # Ensure we have the right number of importance values
+        if len(importance_values) != len(feature_names):
+            print(
+                f"Warning: Feature importance length ({len(importance_values)}) doesn't match feature names length ({len(feature_names)})")
+            # Pad or truncate to match
+            if len(importance_values) < len(feature_names):
+                importance_values.extend(
+                    [0.0] * (len(feature_names) - len(importance_values)))
+            else:
+                importance_values = importance_values[:len(feature_names)]
+
         importance_df = pd.DataFrame({
             'feature': feature_names,
-            'importance': results['feature_importance']
+            'importance': importance_values
         }).sort_values('importance', ascending=False)
 
         importance_file = output_dir / 'feature_importance.csv'
@@ -149,9 +190,26 @@ def _save_text_summary(results, feature_names, output_dir):
 
         # Feature importance insights
         if results['feature_importance'] is not None:
+            # Ensure feature_importance is properly formatted
+            importance_values = results['feature_importance']
+            if isinstance(importance_values, dict):
+                importance_values = list(importance_values.values())
+            elif hasattr(importance_values, 'tolist'):
+                importance_values = importance_values.tolist()
+            elif not isinstance(importance_values, (list, np.ndarray)):
+                importance_values = list(importance_values)
+
+            # Ensure correct length
+            if len(importance_values) != len(feature_names):
+                if len(importance_values) < len(feature_names):
+                    importance_values.extend(
+                        [0.0] * (len(feature_names) - len(importance_values)))
+                else:
+                    importance_values = importance_values[:len(feature_names)]
+
             importance_df = pd.DataFrame({
                 'feature': feature_names,
-                'importance': results['feature_importance']
+                'importance': importance_values
             }).sort_values('importance', ascending=False)
 
             top_feature = importance_df.iloc[0]
@@ -192,9 +250,26 @@ def _save_text_summary(results, feature_names, output_dir):
 
         # Top Features
         if results['feature_importance'] is not None:
+            # Ensure feature_importance is properly formatted
+            importance_values = results['feature_importance']
+            if isinstance(importance_values, dict):
+                importance_values = list(importance_values.values())
+            elif hasattr(importance_values, 'tolist'):
+                importance_values = importance_values.tolist()
+            elif not isinstance(importance_values, (list, np.ndarray)):
+                importance_values = list(importance_values)
+
+            # Ensure correct length
+            if len(importance_values) != len(feature_names):
+                if len(importance_values) < len(feature_names):
+                    importance_values.extend(
+                        [0.0] * (len(feature_names) - len(importance_values)))
+                else:
+                    importance_values = importance_values[:len(feature_names)]
+
             importance_df = pd.DataFrame({
                 'feature': feature_names,
-                'importance': results['feature_importance']
+                'importance': importance_values
             }).sort_values('importance', ascending=False)
 
             f.write("TOP 10 MOST IMPORTANT FEATURES\n")

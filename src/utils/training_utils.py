@@ -92,10 +92,10 @@ def train_model_with_loader(X, y, model_name='random_forest', output_dir='output
             # Fallback to using the primary model if available
             if hasattr(model_instance, 'model') and model_instance.model is not None:
                 try:
-                    if hasattr(model_instance, '_engineer_physics_features'):
-                        X_train_eng = model_instance._engineer_physics_features(
+                    if hasattr(model_instance, '_engineer_fallback_features'):
+                        X_train_eng = model_instance._engineer_fallback_features(
                             X_train)
-                        X_test_eng = model_instance._engineer_physics_features(
+                        X_test_eng = model_instance._engineer_fallback_features(
                             X_test)
                         X_train_scaled = model_instance.scaler.transform(
                             X_train_eng)
@@ -124,8 +124,8 @@ def train_model_with_loader(X, y, model_name='random_forest', output_dir='output
         # Cross-validation with PEECOM
         # For CV, we need to engineer features consistently
         try:
-            if hasattr(model_instance, '_engineer_physics_features'):
-                X_engineered = model_instance._engineer_physics_features(X)
+            if hasattr(model_instance, '_engineer_fallback_features'):
+                X_engineered = model_instance._engineer_fallback_features(X)
                 X_scaled_full = model_instance.scaler.transform(X_engineered)
             else:
                 # Fallback: just scale the original features
@@ -137,8 +137,8 @@ def train_model_with_loader(X, y, model_name='random_forest', output_dir='output
             temp_scaler = StandardScaler()
             X_scaled_full = temp_scaler.fit_transform(X)
         try:
-            if hasattr(model_instance, '_engineer_physics_features'):
-                X_engineered = model_instance._engineer_physics_features(X)
+            if hasattr(model_instance, '_engineer_fallback_features'):
+                X_engineered = model_instance._engineer_fallback_features(X)
                 X_scaled_full = model_instance.scaler.transform(X_engineered)
             else:
                 # Fallback: just scale the original features
@@ -151,9 +151,9 @@ def train_model_with_loader(X, y, model_name='random_forest', output_dir='output
             X_scaled_full = temp_scaler.fit_transform(X)
 
         cv_scores = cross_val_score(
-            model_instance.model, X_scaled_full, y, cv=5)
+            model_instance, X, y, cv=5)
 
-        model = model_instance.model  # For saving
+        model = model_instance  # For saving (the entire PEECOM model)
         scaler = model_instance.scaler  # For saving
 
     else:
