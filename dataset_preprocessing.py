@@ -629,35 +629,60 @@ def main():
         except Exception as e:
             logger.error(f"Dataset analysis failed: {e}")
 
-    # Load sensor data
-    logger.info("Loading sensor data...")
-    sensor_data = load_sensor_data_by_type(dataset_dir)
+    # Try handler-based processing first
+    if dataset_loader and args.dataset:
+        try:
+            handler = dataset_loader.get_handler(args.dataset, config)
+            logger.info(
+                f"Using {type(handler).__name__} for dataset {args.dataset}")
 
-    if not sensor_data:
-        logger.error("No sensor data loaded. Check dataset directory.")
-        return
+            # Use handler-based processing
+            features, targets = handler.load_data()
 
-    # Apply sensor corrections
-    logger.info("Applying sensor corrections...")
-    sensor_data = apply_sensor_corrections(
-        sensor_data, config, args.ps4_correction_method)
+            # Apply any additional preprocessing from handler
+            features, targets = handler.preprocess_data(features, targets)
 
-    # Extract features
-    logger.info("Extracting features from sensor data...")
-    features = extract_features_from_sensors(sensor_data, config)
-    logger.info(f"Extracted features shape: {features.shape}")
+            logger.info(f"Loaded features shape: {features.shape}")
+            logger.info(f"Loaded targets shape: {targets.shape}")
 
-    # Load targets (profile.txt)
-    logger.info("Loading target data...")
-    profile_path = os.path.join(dataset_dir, 'profile.txt')
-    if os.path.exists(profile_path):
-        targets = pd.read_csv(profile_path, delimiter='\t', header=None)
-        targets.columns = ['cooler_condition', 'valve_condition', 'pump_leakage',
-                           'accumulator_pressure', 'stable_flag']
-        logger.info(f"Target data shape: {targets.shape}")
+        except Exception as e:
+            logger.warning(
+                f"Handler-based processing failed: {e}. Falling back to legacy processing...")
+            handler = None
     else:
-        logger.error(f"Profile file not found: {profile_path}")
-        return
+        handler = None
+
+    # Legacy processing for cmohs-style datasets
+    if handler is None:
+        # Load sensor data
+        logger.info("Loading sensor data (legacy mode)...")
+        sensor_data = load_sensor_data_by_type(dataset_dir)
+
+        if not sensor_data:
+            logger.error("No sensor data loaded. Check dataset directory.")
+            return
+
+        # Apply sensor corrections
+        logger.info("Applying sensor corrections...")
+        sensor_data = apply_sensor_corrections(
+            sensor_data, config, args.ps4_correction_method)
+
+        # Extract features
+        logger.info("Extracting features from sensor data...")
+        features = extract_features_from_sensors(sensor_data, config)
+        logger.info(f"Extracted features shape: {features.shape}")
+
+        # Load targets (profile.txt)
+        logger.info("Loading target data...")
+        profile_path = os.path.join(dataset_dir, 'profile.txt')
+        if os.path.exists(profile_path):
+            targets = pd.read_csv(profile_path, delimiter='\t', header=None)
+            targets.columns = ['cooler_condition', 'valve_condition', 'pump_leakage',
+                               'accumulator_pressure', 'stable_flag']
+            logger.info(f"Target data shape: {targets.shape}")
+        else:
+            logger.error(f"Profile file not found: {profile_path}")
+            return
 
     # Ensure same number of samples
     min_samples = min(len(features), len(targets))
@@ -679,7 +704,6 @@ def main():
     metadata = {
         'preprocessing_timestamp': datetime.now().isoformat(),
         'dataset_name': dataset_name,
-        'ps4_correction_method': args.ps4_correction_method,
         'dataset_dir': dataset_dir,
         'output_dir': base_output_dir,
         'processed_data_dir': processed_data_dir,
@@ -689,11 +713,14 @@ def main():
         'splits': {
             split: len(data) for split, data in features_splits.items()
         },
+        'processing_method': type(handler).__name__ if handler else 'legacy_sensor_processing',
+        'ps4_correction_method': args.ps4_correction_method,
         'sensor_corrections_applied': config.get('preprocessing', {}).get('sensor_correction', {}),
         'feature_extraction_config': config.get('preprocessing', {}).get('feature_extraction', {}),
-        'ps4_correction_method': args.ps4_correction_method,
         'command_line_args': vars(args)
-    }    # Save processed data
+    }
+
+    # Save processed data
     logger.info("Saving processed data...")
     save_processed_data(features_splits, targets_splits,
                         processed_data_dir, metadata)

@@ -10,6 +10,7 @@ from src.models.model_loader import model_loader
 import pandas as pd
 import numpy as np
 import joblib
+import signal
 from sklearn.model_selection import train_test_split, cross_val_score
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import classification_report, confusion_matrix, accuracy_score
@@ -44,13 +45,52 @@ def prepare_targets(y, target_column='stable_flag'):
     if target_column in y.columns:
         target = y[target_column].values
         print(f"Using {target_column} as target")
+
+        # Handle different data types
+        if target.dtype == 'float64':
+            # Check if float values are actually integers
+            if np.all(np.equal(np.mod(target, 1), 0)):
+                # Safe to convert to int
+                target = target.astype(int)
+                print(f"Converted float target to int")
+            else:
+                # Round to nearest integer for classification
+                target = np.round(target).astype(int)
+                print(f"Rounded float target to int for classification")
+
+        # Ensure labels start from 0 for sklearn
+        unique_vals = np.unique(target)
+        if len(unique_vals) > 1 and np.min(unique_vals) != 0:
+            # Create label mapping
+            label_map = {val: idx for idx,
+                         val in enumerate(sorted(unique_vals))}
+            target = np.array([label_map[val] for val in target])
+            print(
+                f"Remapped target labels: {dict(zip(sorted(unique_vals), range(len(unique_vals))))}")
+
         print(f"Target distribution: {np.bincount(target)}")
         return target
     else:
         print(f"Available target columns: {list(y.columns)}")
         # Default to first column
         target = y.iloc[:, 0].values
+
+        # Apply same preprocessing to default target
+        if target.dtype == 'float64':
+            if np.all(np.equal(np.mod(target, 1), 0)):
+                target = target.astype(int)
+            else:
+                target = np.round(target).astype(int)
+
+        # Ensure labels start from 0
+        unique_vals = np.unique(target)
+        if len(unique_vals) > 1 and np.min(unique_vals) != 0:
+            label_map = {val: idx for idx,
+                         val in enumerate(sorted(unique_vals))}
+            target = np.array([label_map[val] for val in target])
+
         print(f"Using {y.columns[0]} as target")
+        print(f"Target distribution: {np.bincount(target)}")
         return target
 
 
@@ -238,6 +278,27 @@ def evaluate_all_targets(data_dir: str, output_dir: str, model_name: str = 'rand
     # Load data
     X, y = load_processed_data(data_dir)
 
+    # Check dataset size and warn about complex models
+    n_samples, n_features = X.shape
+    print(f"Dataset size: {n_samples} samples, {n_features} features")
+
+    if model_name == 'peecom' and n_samples > 5000:
+        print(f"⚠️  Warning: Large dataset ({n_samples} samples) detected.")
+        print(
+            f"⚠️  PEECOM model may take a long time. Consider using random_forest instead.")
+
+        # Ask for confirmation or provide timeout
+        import signal
+
+        def timeout_handler(signum, frame):
+            raise TimeoutError(
+                "Training timeout - dataset too large for PEECOM model")
+
+        # Set a 5-minute timeout for PEECOM on large datasets
+        if n_samples > 5000:
+            signal.signal(signal.SIGALRM, timeout_handler)
+            signal.alarm(300)  # 5 minutes
+
     results = {}
 
     # Evaluate each target
@@ -245,6 +306,14 @@ def evaluate_all_targets(data_dir: str, output_dir: str, model_name: str = 'rand
         print(f"\n--- Evaluating {target_col} ---")
         try:
             target = prepare_targets(y, target_col)
+
+            # Skip if target has only one class
+            if len(np.unique(target)) < 2:
+                print(f"⚠️  Skipping {target_col}: Only one class found")
+                results[target_col] = {
+                    'error': 'Single class target - no classification possible'}
+                continue
+
             model, scaler, result, model_output_dir = train_model_with_loader(
                 X, target, model_name, output_dir, target_col
             )
@@ -259,9 +328,20 @@ def evaluate_all_targets(data_dir: str, output_dir: str, model_name: str = 'rand
 
             results[target_col] = result
             print(f"✓ {target_col}: {result['test_accuracy']:.4f} accuracy")
+
+        except TimeoutError as e:
+            print(f"✗ {target_col}: Timeout - {str(e)}")
+            print(f"💡 Suggestion: Try with --model random_forest for faster training")
+            results[target_col] = {'error': f'Timeout: {str(e)}'}
+            break  # Don't try remaining targets if we're timing out
+
         except Exception as e:
             print(f"✗ {target_col}: Failed - {str(e)}")
             results[target_col] = {'error': str(e)}
+
+    # Clear any remaining timeout
+    if model_name == 'peecom' and n_samples > 5000:
+        signal.alarm(0)
 
     # Save summary results
     import json

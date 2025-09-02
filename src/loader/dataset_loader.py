@@ -10,13 +10,16 @@ Usage:
     from src.loader.dataset_loader import dataset_loader
     dataset_dir = dataset_loader.get_dataset_dir('cmohs')
     choices = dataset_loader.get_dataset_choices()
+    handler = dataset_loader.get_handler('cmohs', config)
 
 This keeps dataset access non-hardcoded and extensible.
 """
 
 import os
 import glob
+import yaml
 from typing import Dict, Optional, Any, List, Tuple
+from .handlers import get_handler_for_dataset, BaseDatasetHandler
 
 
 class DatasetLoader:
@@ -38,80 +41,120 @@ class DatasetLoader:
         self.dataset_root = os.path.join(self.repo_root, 'dataset')
         self._datasets: Dict[str, Dict[str, Any]] = {}
 
+        # Load dataset configurations
+        self.dataset_configs = self._load_dataset_configs()
+
         # Discover datasets automatically
         self._discover_datasets()
 
+    def _load_dataset_configs(self) -> Dict[str, Any]:
+        """Load dataset configurations from datasets.yaml"""
+        config_path = os.path.join(
+            self.repo_root, 'src', 'config', 'datasets.yaml')
+        if os.path.exists(config_path):
+            with open(config_path, 'r') as f:
+                config = yaml.safe_load(f)
+                return config.get('datasets', {})
+        return {}
+
     def _discover_datasets(self) -> None:
-        """Discover subdirectories under dataset/ and register them"""
-        if not os.path.isdir(self.dataset_root):
+        """Discover datasets in the dataset/ directory"""
+        if not os.path.exists(self.dataset_root):
             return
 
-        # Some directories in dataset/ are backups (for example 'all').
-        # Only register folders that look like real datasets (contain profile.txt,
-        # or contain non-empty CSV/TXT sensor files). This avoids exposing
-        # archive/backup folders as processable datasets.
-        ignore_dirs = {'all', '.gitkeep', '__pycache__'}
+        for item in os.listdir(self.dataset_root):
+            item_path = os.path.join(self.dataset_root, item)
+            if os.path.isdir(item_path) and not item.startswith('.'):
+                # Skip backup directories
+                if item == 'all':
+                    continue
 
-        for entry in sorted(os.listdir(self.dataset_root)):
-            if entry in ignore_dirs:
-                continue
+                # Analyze dataset structure
+                usable, dataset_type = self._analyze_dataset_structure(
+                    item_path)
 
-            path = os.path.join(self.dataset_root, entry)
-            if not os.path.isdir(path):
-                continue
+                # Get metadata from config if available
+                metadata = self.dataset_configs.get(item, {})
 
-            # Determine if folder looks like a usable dataset
-            usable, dataset_type = self._is_dataset_usable(path)
+                self._datasets[item] = {
+                    'path': item_path,
+                    'type': dataset_type,
+                    'usable': usable,
+                    'metadata': metadata,
+                    'config': metadata.get('preprocessing', {})
+                }
 
-            # Register with minimal metadata
-            self._datasets[entry] = {
-                'name': entry,
-                'path': path,
-                'type': dataset_type,
-                'usable': usable,
-                'metadata': {}
-            }
+    def _analyze_dataset_structure(self, dataset_dir: str) -> Tuple[bool, str]:
+        """Analyze directory structure to determine dataset type"""
+        files = os.listdir(dataset_dir)
 
-    def register_dataset(self, name: str, path: str, metadata: Optional[Dict[str, Any]] = None) -> None:
-        """Register or override a dataset entry.
+        # Check for profile.txt (text sensors dataset like cmohs)
+        if 'profile.txt' in files:
+            # Count sensor text files
+            sensor_files = [f for f in files if f.endswith(
+                '.txt') and len(f) <= 4]
+            if len(sensor_files) >= 3:
+                return True, 'text_sensors'
 
-        Args:
-            name: dataset key name
-            path: absolute or relative path to dataset folder
-            metadata: optional dict of metadata
-        """
-        abs_path = os.path.abspath(path)
-        self._datasets[name] = {
-            'name': name,
-            'path': abs_path,
-            'type': 'custom',
-            'usable': True,
-            'metadata': metadata or {}
-        }
+        # Check for single CSV file
+        csv_files = [f for f in files if f.endswith('.csv')]
+        if len(csv_files) == 1:
+            return True, 'csv'
 
-    def get_available_datasets(self) -> List[str]:
-        """Return list of registered dataset names"""
-        return list(self._datasets.keys())
+        # Check for multiple CSV files
+        if len(csv_files) > 1:
+            return True, 'multi_csv'
 
-    def get_usable_datasets(self) -> List[str]:
-        """Return list of datasets that look processable (usable==True)"""
-        return [n for n, v in self._datasets.items() if v.get('usable', False)]
+        # Check for text data files (space-separated)
+        txt_files = [f for f in files if f.endswith(
+            '.txt') and 'train' in f.lower() or 'test' in f.lower()]
+        if len(txt_files) >= 2:
+            return True, 'text_data'
 
-    def get_dataset_dir(self, name: str) -> str:
-        """Get the absolute dataset directory for a registered dataset name.
+        # Default to empty if no recognizable pattern
+        return False, 'empty'
 
-        Raises KeyError if not found.
-        """
-        if name not in self._datasets:
-            raise KeyError(
-                f"Dataset '{name}' is not registered. Available: {self.get_available_datasets()}")
-        return self._datasets[name]['path']
+    def get_dataset_choices(self) -> List[str]:
+        """Get list of usable dataset names for CLI choices"""
+        return [name for name, info in self._datasets.items() if info.get('usable')]
 
     def get_dataset_info(self, name: str) -> Dict[str, Any]:
-        """Return the dataset registry entry"""
-        return self._datasets.get(name, {})
+        """Get full information about a dataset"""
+        if name not in self._datasets:
+            raise KeyError(f"Dataset '{name}' not found")
+        return self._datasets[name]
+
+    def get_dataset_dir(self, name: str) -> str:
+        """Get the directory path for a dataset"""
+        return self.get_dataset_info(name)['path']
+
+    def register_dataset(self, name: str, path: str, dataset_type: str = 'custom', **metadata) -> None:
+        """Register a custom dataset"""
+        self._datasets[name] = {
+            'path': os.path.abspath(path),
+            'type': dataset_type,
+            'usable': True,
+            'metadata': metadata
+        }
+
+    def get_handler(self, name: str, global_config: Optional[Dict[str, Any]] = None) -> BaseDatasetHandler:
+        """Get a dataset handler for the specified dataset"""
+        if name not in self._datasets:
+            raise KeyError(f"Dataset '{name}' not found")
+
+        dataset_dir = self._datasets[name]['path']
+        dataset_config = self._datasets[name].get('config', {})
+
+        # Merge global config with dataset-specific config
+        if global_config:
+            merged_config = {**global_config, **dataset_config}
+        else:
+            merged_config = dataset_config
+
+        return get_handler_for_dataset(dataset_dir, merged_config)
 
     def list_datasets(self, verbose: bool = False) -> None:
+        """List all discovered datasets"""
         print("Available datasets:")
         for name, info in self._datasets.items():
             usable_flag = ' (usable)' if info.get('usable') else ' (ignored)'
@@ -120,61 +163,18 @@ class DatasetLoader:
                 print(f"  type: {info.get('type')}")
                 print(f"  metadata: {info.get('metadata')}")
 
-    def get_dataset_choices(self) -> List[str]:
-        """Return choices suitable for CLI argument parsing"""
-        # By default, only return usable datasets so CLI choices don't include backup folders
-        return self.get_usable_datasets()
-
-    def _is_dataset_usable(self, path: str) -> Tuple[bool, str]:
-        """Heuristic checks to decide if a folder under dataset/ is processable.
-
-        Returns (usable: bool, dataset_type: str)
-        dataset_type is a short hint: 'folder_profile', 'single_csv', 'text_sensors', or 'empty'.
-        """
-        # Check for profile.txt (like cmohs)
-        profile_path = os.path.join(path, 'profile.txt')
-        if os.path.isfile(profile_path):
-            return True, 'folder_profile'
-
-        # Check for at least one non-empty CSV file (equipmentad, mlclassem, smartmd)
-        csv_files = [f for f in os.listdir(path) if f.lower().endswith('.csv')]
-        for f in csv_files:
-            full = os.path.join(path, f)
-            try:
-                if os.path.getsize(full) > 0:
-                    return True, 'single_csv'
-            except OSError:
-                continue
-
-        # Check for multiple non-empty .txt sensor files
-        txt_files = [f for f in os.listdir(path) if f.lower().endswith('.txt')]
-        valid_txts = 0
-        for f in txt_files:
-            if f.lower() in ('description.txt', 'documentation.txt', 'readme.txt'):
-                continue
-            full = os.path.join(path, f)
-            try:
-                if os.path.getsize(full) > 0:
-                    valid_txts += 1
-            except OSError:
-                continue
-
-        if valid_txts >= 1:
-            return True, 'text_sensors'
-
-        # No usable files discovered
-        return False, 'empty'
-
 
 # Global singleton instance
 dataset_loader = DatasetLoader()
 
 
 def get_dataset(name: str) -> Dict[str, Any]:
+    """Get dataset info using the global instance"""
     return dataset_loader.get_dataset_info(name)
 
 
 def get_dataset_dir(name: str) -> str:
+    """Get dataset directory using the global instance"""
     return dataset_loader.get_dataset_dir(name)
 
 
