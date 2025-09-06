@@ -10,6 +10,7 @@ from src.models.model_loader import model_loader
 import pandas as pd
 import numpy as np
 import joblib
+import os
 import signal
 from sklearn.model_selection import train_test_split, cross_val_score
 from sklearn.preprocessing import StandardScaler
@@ -26,11 +27,21 @@ if src_dir not in sys.path:
 
 
 def load_processed_data(data_dir):
-    """Load processed features and targets from CSV files"""
+    """Load processed features and targets from CSV files - prioritize cleaned versions"""
     print(f"Loading data from: {data_dir}")
 
-    # Load features and targets
-    X = pd.read_csv(os.path.join(data_dir, 'X_full.csv'))
+    # Check for cleaned version first, fallback to original
+    x_clean_path = os.path.join(data_dir, 'X_full_clean.csv')
+    x_original_path = os.path.join(data_dir, 'X_full.csv')
+
+    if os.path.exists(x_clean_path):
+        print("📦 Using cleaned dataset (data leakage removed)")
+        X = pd.read_csv(x_clean_path)
+    else:
+        print("📦 Using original dataset")
+        X = pd.read_csv(x_original_path)
+
+    # Load targets (always use original as targets don't need cleaning)
     y = pd.read_csv(os.path.join(data_dir, 'y_full.csv'))
 
     print(f"Features shape: {X.shape}")

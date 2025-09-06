@@ -9,6 +9,7 @@ can be accessed by name.
 
 from .peecom_model import PEECOMModel
 from .unified_peecom import PEECOMModel as UnifiedPEECOMModel
+from .peecom_enhanced import EnhancedPEECOMClassifier
 from .gradient_boosting_model import GradientBoostingModel
 from .svm_model import SVMModel
 from .logistic_regression_model import LogisticRegressionModel
@@ -74,12 +75,20 @@ class ModelLoader:
                 'cons': ['Can overfit', 'Sensitive to hyperparameters', 'Longer training time']
             },
             'peecom': {
-                'class': UnifiedPEECOMModel,
-                'display_name': 'PEECOM (Physics-Enhanced)',
-                'description': 'Advanced Physics-Enhanced Equipment Condition Monitoring with modular architecture',
+                'class': EnhancedPEECOMClassifier,
+                'display_name': 'PEECOM Enhanced (Physics-Aware)',
+                'description': 'Advanced Physics-Enhanced Equipment Condition Monitoring with hydraulic-specific features',
                 'suitable_for': ['hydraulic_systems', 'maximum_performance', 'physics_aware', 'condition_monitoring'],
-                'pros': ['Modular architecture', 'Maximum accuracy', 'Advanced ensemble techniques', 'Physics-informed features', 'Scalable design'],
-                'cons': ['Higher computational cost', 'More complex architecture']
+                'pros': ['Physics-informed features', 'Data leakage prevention', 'Hydraulic-specific', 'Ensemble approach', 'Cross-validation'],
+                'cons': ['Specific to hydraulic systems', 'Higher complexity']
+            },
+            'peecom_unified': {
+                'class': UnifiedPEECOMModel,
+                'display_name': 'PEECOM (Unified)',
+                'description': 'Unified PEECOM implementation for general applications',
+                'suitable_for': ['general_applications', 'modular_architecture'],
+                'pros': ['Modular architecture', 'General purpose', 'Advanced ensemble techniques'],
+                'cons': ['Less specialized than Enhanced version']
             },
             'peecom_legacy': {
                 'class': PEECOMModel,
@@ -87,7 +96,7 @@ class ModelLoader:
                 'description': 'Original PEECOM implementation for backward compatibility',
                 'suitable_for': ['legacy_systems', 'backward_compatibility'],
                 'pros': ['Backward compatible', 'Simpler implementation'],
-                'cons': ['Lower performance than unified version']
+                'cons': ['Lower performance than enhanced versions']
             }
         }
         return models
