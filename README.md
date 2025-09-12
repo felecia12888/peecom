@@ -903,3 +903,25 @@ The PEECOM platform now serves as a complete industrial monitoring solution, cap
 ## 🚀 **Ready for Production!**
 
 The complete pipeline from data processing to trained models is ready for deployment in hydraulic system condition monitoring applications.
+
+
+```bash
+
+## Peecom
+
+python main.py --dataset cmohs --model peecom --eval-all && python main.py --dataset equipmentad --model peecom --eval-all && python main.py --dataset mlclassem --model peecom --eval-all && python main.py --dataset motorvd --model peecom --eval-all && python main.py --dataset multivariatetsd --model peecom --eval-all && python main.py --dataset sensord --model peecom --eval-all && python main.py --dataset smartmd --model peecom --eval-all
+
+## Random Forest
+
+python main.py --dataset cmohs --model random_forest --eval-all && python main.py --dataset equipmentad --model random_forest --eval-all && python main.py --dataset mlclassem --model random_forest --eval-all && python main.py --dataset motorvd --model random_forest --eval-all && python main.py --dataset multivariatetsd --model random_forest --eval-all && python main.py --dataset sensord --model random_forest --eval-all && python main.py --dataset smartmd --model random_forest --eval-all
+
+## SVM
+
+python main.py --dataset cmohs --model svm --eval-all && python main.py --dataset equipmentad --model svm --eval-all && python main.py --dataset mlclassem --model svm --eval-all && python main.py --dataset motorvd --model svm --eval-all && python main.py --dataset multivariatetsd --model svm --eval-all && python main.py --dataset sensord --model svm --eval-all && python main.py --dataset smartmd --model svm --eval-all
+
+
+## Logistic Regression
+
+python main.py --dataset cmohs --model logistic_regression --eval-all && python main.py --dataset equipmentad --model logistic_regression --eval-all && python main.py --dataset mlclassem --model logistic_regression --eval-all && python main.py --dataset motorvd --model logistic_regression --eval-all && python main.py --dataset multivariatetsd --model logistic_regression --eval-all && python main.py --dataset sensord --model logistic_regression --eval-all && python main.py --dataset smartmd --model logistic_regression --eval-all
+
+```

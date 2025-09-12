@@ -211,3 +211,6 @@ loader/backup_preprocess.py
 loader/data_analysis/dataset_analysis_results.txt
 loader/data_analysis/dataset_analysis_results.csv
 loader/data_analysis/analysis_figures
+
+# Archive directory for old/experimental files
+archive/

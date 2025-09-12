@@ -138,7 +138,8 @@ def main():
         if args.eval_all:
             print(
                 f"Training {model_loader.get_model_display_name(args.model)} for all target variables...")
-            results = evaluate_all_targets(data_path, args.output, args.model)
+            results = evaluate_all_targets(
+                data_path, args.output, args.model, dataset_name)
         else:
             # Load data
             X, y = load_processed_data(data_path)
@@ -148,7 +149,7 @@ def main():
 
             # Train model using model loader
             model, scaler, results, model_output_dir = train_model_with_loader(
-                X, target, args.model, args.output, args.target
+                X, target, args.model, args.output, args.target, dataset_name
             )
 
             # Save results using results handler

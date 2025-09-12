@@ -105,13 +105,18 @@ def prepare_targets(y, target_column='stable_flag'):
         return target
 
 
-def train_model_with_loader(X, y, model_name='random_forest', output_dir='output/models', target_name='unknown'):
+def train_model_with_loader(X, y, model_name='random_forest', output_dir='output/models', target_name='unknown', dataset_name=None):
     """Train a model using the model loader system"""
     print(
         f"\nTraining {model_loader.get_model_display_name(model_name)} model...")
 
-    # Create output directory structure: output/models/model_name/target_name/
-    model_output_dir = Path(output_dir) / model_name / target_name
+    # Create output directory structure: output/models/dataset/model_name/target_name/
+    if dataset_name:
+        model_output_dir = Path(output_dir) / \
+            dataset_name / model_name / target_name
+    else:
+        # Fallback to old structure if no dataset specified
+        model_output_dir = Path(output_dir) / model_name / target_name
     model_output_dir.mkdir(parents=True, exist_ok=True)
 
     # Split the data
@@ -119,8 +124,13 @@ def train_model_with_loader(X, y, model_name='random_forest', output_dir='output
         X, y, test_size=0.2, random_state=42, stratify=y
     )
 
-    # Load model from model loader
-    model_instance = model_loader.load_model(model_name)
+    # Load model from model loader with dataset size for optimization
+    dataset_size = len(X)
+    if model_name == 'svm':
+        model_instance = model_loader.load_model(
+            model_name, dataset_size=dataset_size)
+    else:
+        model_instance = model_loader.load_model(model_name)
 
     # Handle PEECOM model differently (it has its own preprocessing)
     if model_name == 'peecom':
@@ -279,7 +289,7 @@ def train_model_with_loader(X, y, model_name='random_forest', output_dir='output
     return model, scaler, results, model_output_dir
 
 
-def evaluate_all_targets(data_dir: str, output_dir: str, model_name: str = 'random_forest'):
+def evaluate_all_targets(data_dir: str, output_dir: str, model_name: str = 'random_forest', dataset_name=None):
     """Evaluate model performance on all available targets"""
     print("\n" + "="*60)
     print(
@@ -298,17 +308,53 @@ def evaluate_all_targets(data_dir: str, output_dir: str, model_name: str = 'rand
         print(
             f"⚠️  PEECOM model may take a long time. Consider using random_forest instead.")
 
+    if model_name == 'svm':
+        if n_samples > 20000:
+            print(
+                f"⚠️  Warning: Very large dataset ({n_samples} samples) for SVM.")
+            print(
+                f"⚠️  SVM will use linear kernel for speed. Training may still take time.")
+        elif n_samples > 10000:
+            print(f"⚠️  Warning: Large dataset ({n_samples} samples) for SVM.")
+            print(
+                f"⚠️  SVM will use optimized parameters. Consider using random_forest for faster training.")
+        elif n_samples > 5000:
+            print(f"⚠️  Note: Medium dataset ({n_samples} samples) for SVM.")
+            print(f"⚠️  SVM training may take a few minutes.")
+
         # Ask for confirmation or provide timeout
         import signal
 
         def timeout_handler(signum, frame):
-            raise TimeoutError(
-                "Training timeout - dataset too large for PEECOM model")
+            if model_name == 'peecom':
+                raise TimeoutError(
+                    "Training timeout - dataset too large for PEECOM model")
+            elif model_name == 'svm':
+                raise TimeoutError(
+                    "Training timeout - dataset too large for SVM model")
+            else:
+                raise TimeoutError(
+                    f"Training timeout - dataset too large for {model_name} model")
 
-        # Set a 5-minute timeout for PEECOM on large datasets
-        if n_samples > 5000:
+        # Set timeout for complex models on large datasets
+        timeout_needed = False
+        timeout_seconds = 300  # Default 5 minutes
+
+        if model_name == 'peecom' and n_samples > 5000:
+            timeout_needed = True
+            timeout_seconds = 300  # 5 minutes for PEECOM
+        elif model_name == 'svm' and n_samples > 10000:
+            timeout_needed = True
+            timeout_seconds = 600  # 10 minutes for SVM on large datasets
+        elif model_name == 'svm' and n_samples > 5000:
+            timeout_needed = True
+            timeout_seconds = 300  # 5 minutes for SVM on medium datasets
+
+        if timeout_needed:
             signal.signal(signal.SIGALRM, timeout_handler)
-            signal.alarm(300)  # 5 minutes
+            signal.alarm(timeout_seconds)
+            print(
+                f"⏰ Timeout set: {timeout_seconds//60} minutes for {model_name} on large dataset")
 
     results = {}
 
@@ -326,7 +372,7 @@ def evaluate_all_targets(data_dir: str, output_dir: str, model_name: str = 'rand
                 continue
 
             model, scaler, result, model_output_dir = train_model_with_loader(
-                X, target, model_name, output_dir, target_col
+                X, target, model_name, output_dir, target_col, dataset_name
             )
 
             # Save results using results handler
