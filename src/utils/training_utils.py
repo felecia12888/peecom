@@ -79,8 +79,54 @@ def prepare_targets(y, target_column='stable_flag'):
             print(
                 f"Remapped target labels: {dict(zip(sorted(unique_vals), range(len(unique_vals))))}")
 
+        # Check class distribution and filter out classes with too few samples
+        class_counts = np.bincount(target)
+        min_samples_per_class = 2  # Minimum required for cross-validation
+
+        # Find classes with insufficient samples
+        insufficient_classes = np.where(
+            class_counts < min_samples_per_class)[0]
+
+        if len(insufficient_classes) > 0:
+            print(
+                f"⚠️  Warning: Found {len(insufficient_classes)} classes with < {min_samples_per_class} samples")
+            print(f"Insufficient classes: {insufficient_classes.tolist()}")
+
+            # Check if too many classes have insufficient samples
+            sufficient_classes = np.where(
+                class_counts >= min_samples_per_class)[0]
+
+            if len(sufficient_classes) < 2:
+                raise ValueError(
+                    f"Not enough classes with sufficient samples. Need at least 2 classes with {min_samples_per_class}+ samples each.")
+
+            # If more than 50% of classes have insufficient samples, it's likely not a good classification target
+            if len(insufficient_classes) > len(sufficient_classes):
+                raise ValueError(
+                    f"Too many classes ({len(insufficient_classes)}) with insufficient samples. This target may not be suitable for classification.")
+
+            # Actually filter out samples with insufficient classes
+            print(
+                f"🔧 Filtering out samples from {len(insufficient_classes)} insufficient classes...")
+            mask = ~np.isin(target, insufficient_classes)
+            target_filtered = target[mask]
+
+            # Remap labels to be continuous starting from 0
+            unique_vals = np.unique(target_filtered)
+            label_map = {val: idx for idx,
+                         val in enumerate(sorted(unique_vals))}
+            target = np.array([label_map[val] for val in target_filtered])
+
+            print(
+                f"Filtered dataset: {len(target_filtered)} samples, {len(unique_vals)} classes")
+            print(
+                f"Target distribution after filtering: {np.bincount(target)}")
+
+            # Return both the filtered target and the mask for X filtering
+            return target, mask
+
         print(f"Target distribution: {np.bincount(target)}")
-        return target
+        return target, None
     else:
         print(f"Available target columns: {list(y.columns)}")
         # Default to first column
@@ -100,9 +146,48 @@ def prepare_targets(y, target_column='stable_flag'):
                          val in enumerate(sorted(unique_vals))}
             target = np.array([label_map[val] for val in target])
 
+        # Apply the same class distribution check
+        class_counts = np.bincount(target)
+        min_samples_per_class = 2
+        insufficient_classes = np.where(
+            class_counts < min_samples_per_class)[0]
+
+        if len(insufficient_classes) > 0:
+            print(
+                f"⚠️  Warning: Found {len(insufficient_classes)} classes with < {min_samples_per_class} samples in default target")
+            print(f"Insufficient classes: {insufficient_classes.tolist()}")
+
+            sufficient_classes = np.where(
+                class_counts >= min_samples_per_class)[0]
+            if len(sufficient_classes) < 2:
+                raise ValueError(
+                    f"Not enough classes with sufficient samples in default target. Need at least 2 classes with {min_samples_per_class}+ samples each.")
+            if len(insufficient_classes) > len(sufficient_classes):
+                raise ValueError(
+                    f"Default target has too many classes with insufficient samples and may not be suitable for classification.")
+
+            # Filter out samples with insufficient classes
+            print(
+                f"🔧 Filtering out samples from {len(insufficient_classes)} insufficient classes...")
+            mask = ~np.isin(target, insufficient_classes)
+            target_filtered = target[mask]
+
+            # Remap labels to be continuous starting from 0
+            unique_vals = np.unique(target_filtered)
+            label_map = {val: idx for idx,
+                         val in enumerate(sorted(unique_vals))}
+            target = np.array([label_map[val] for val in target_filtered])
+
+            print(
+                f"Filtered dataset: {len(target_filtered)} samples, {len(unique_vals)} classes")
+            print(
+                f"Target distribution after filtering: {np.bincount(target)}")
+
+            return target, mask
+
         print(f"Using {y.columns[0]} as target")
         print(f"Target distribution: {np.bincount(target)}")
-        return target
+        return target, None
 
 
 def train_model_with_loader(X, y, model_name='random_forest', output_dir='output/models', target_name='unknown', dataset_name=None):
@@ -362,7 +447,7 @@ def evaluate_all_targets(data_dir: str, output_dir: str, model_name: str = 'rand
     for target_col in y.columns:
         print(f"\n--- Evaluating {target_col} ---")
         try:
-            target = prepare_targets(y, target_col)
+            target, mask = prepare_targets(y, target_col)
 
             # Skip if target has only one class
             if len(np.unique(target)) < 2:
@@ -371,20 +456,57 @@ def evaluate_all_targets(data_dir: str, output_dir: str, model_name: str = 'rand
                     'error': 'Single class target - no classification possible'}
                 continue
 
+            # Apply mask to X if filtering was applied
+            X_filtered = X[mask] if mask is not None else X
+
+            # Additional check: If target has too many unique classes (likely continuous), skip or warn
+            n_unique_classes = len(np.unique(target))
+            n_samples = len(target)
+
+            # Skip targets with too many classes for SVM
+            if model_name == 'svm' and n_unique_classes > 50:
+                print(
+                    f"⚠️  Skipping {target_col}: Too many classes ({n_unique_classes}) for SVM")
+                results[target_col] = {
+                    'error': f'SVM skipped - too many classes ({n_unique_classes})'}
+                continue
+
+            if n_unique_classes > n_samples * 0.5:  # If more than 50% of samples are unique classes
+                print(
+                    f"⚠️  Warning: {target_col} has {n_unique_classes} unique classes out of {n_samples} samples")
+                print(
+                    f"⚠️  This target may be better suited for regression than classification")
+                if n_unique_classes > 200:  # Skip targets with too many classes
+                    print(
+                        f"⚠️  Skipping {target_col}: Too many classes ({n_unique_classes}) for practical classification")
+                    results[target_col] = {
+                        'error': f'Too many classes ({n_unique_classes}) - likely continuous target not suitable for classification'}
+                    continue
+
             model, scaler, result, model_output_dir = train_model_with_loader(
-                X, target, model_name, output_dir, target_col, dataset_name
+                X_filtered, target, model_name, output_dir, target_col, dataset_name
             )
 
             # Save results using results handler
             from src.utils.results_handler import save_training_results
             # Use the correct feature names from the results, not the original X.columns
             feature_names_for_saving = result.get(
-                'feature_names', list(X.columns))
+                'feature_names', list(X_filtered.columns))
             save_training_results(
                 result, feature_names_for_saving, model_output_dir)
 
             results[target_col] = result
             print(f"✓ {target_col}: {result['test_accuracy']:.4f} accuracy")
+
+        except ValueError as e:
+            if "insufficient samples" in str(e).lower() or "not suitable for classification" in str(e).lower():
+                print(f"⚠️  Skipping {target_col}: {str(e)}")
+                results[target_col] = {
+                    'error': f'Target validation failed: {str(e)}'}
+                continue  # Skip this target but continue with others
+            else:
+                print(f"✗ {target_col}: Failed - {str(e)}")
+                results[target_col] = {'error': str(e)}
 
         except TimeoutError as e:
             print(f"✗ {target_col}: Timeout - {str(e)}")
