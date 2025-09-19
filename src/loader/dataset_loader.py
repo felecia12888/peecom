@@ -90,9 +90,9 @@ class DatasetLoader:
 
         # Check for profile.txt (text sensors dataset like cmohs)
         if 'profile.txt' in files:
-            # Count sensor text files
-            sensor_files = [f for f in files if f.endswith(
-                '.txt') and len(f) <= 4]
+            # Count sensor text files (exclude long descriptive files)
+            sensor_files = [f for f in files if f.endswith('.txt') and 
+                          f not in ['profile.txt', 'description.txt', 'documentation.txt']]
             if len(sensor_files) >= 3:
                 return True, 'text_sensors'
 
