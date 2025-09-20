@@ -376,6 +376,8 @@ def train_model_with_loader(X, y, model_name='random_forest', output_dir='output
 
 def evaluate_all_targets(data_dir: str, output_dir: str, model_name: str = 'random_forest', dataset_name=None):
     """Evaluate model performance on all available targets"""
+    import platform  # Import platform module for cross-platform timeout handling
+    
     print("\n" + "="*60)
     print(
         f"EVALUATING ALL TARGETS WITH {model_loader.get_model_display_name(model_name).upper()}")
@@ -409,6 +411,9 @@ def evaluate_all_targets(data_dir: str, output_dir: str, model_name: str = 'rand
 
         # Ask for confirmation or provide timeout
         import signal
+        import platform
+        import threading
+        import time
 
         def timeout_handler(signum, frame):
             if model_name == 'peecom':
@@ -424,6 +429,7 @@ def evaluate_all_targets(data_dir: str, output_dir: str, model_name: str = 'rand
         # Set timeout for complex models on large datasets
         timeout_needed = False
         timeout_seconds = 300  # Default 5 minutes
+        timeout_thread = None
 
         if model_name == 'peecom' and n_samples > 5000:
             timeout_needed = True
@@ -436,8 +442,21 @@ def evaluate_all_targets(data_dir: str, output_dir: str, model_name: str = 'rand
             timeout_seconds = 300  # 5 minutes for SVM on medium datasets
 
         if timeout_needed:
-            signal.signal(signal.SIGALRM, timeout_handler)
-            signal.alarm(timeout_seconds)
+            # Use platform-appropriate timeout mechanism
+            if platform.system() != 'Windows':
+                # Unix systems: use signal-based timeout
+                signal.signal(signal.SIGALRM, timeout_handler)
+                signal.alarm(timeout_seconds)
+            else:
+                # Windows: use threading-based timeout (but don't interrupt - just warn)
+                def timeout_warning():
+                    time.sleep(timeout_seconds)
+                    print(f"\n⚠️  Warning: Training has been running for {timeout_seconds//60} minutes.")
+                    print(f"⚠️  Consider stopping if it seems stuck (Ctrl+C)")
+                
+                timeout_thread = threading.Thread(target=timeout_warning, daemon=True)
+                timeout_thread.start()
+            
             print(
                 f"⏰ Timeout set: {timeout_seconds//60} minutes for {model_name} on large dataset")
 
@@ -520,7 +539,10 @@ def evaluate_all_targets(data_dir: str, output_dir: str, model_name: str = 'rand
 
     # Clear any remaining timeout
     if model_name == 'peecom' and n_samples > 5000:
-        signal.alarm(0)
+        if platform.system() != 'Windows':
+            # Unix systems: clear alarm
+            signal.alarm(0)
+        # Windows: timeout thread will naturally finish when function exits
 
     # Save summary results
     import json

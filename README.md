@@ -28,6 +28,14 @@ PEECOM (Pressure, Efficiency, and Energy Condition Monitoring) is a robust data 
 - **5 target variables** for multi-class classification
 - **Clean, organized structure** ready for model training
 
+### ✅ **Comprehensive Model Performance Visualization**
+
+- **🎨 4 visualization scripts** for comprehensive model analysis
+- **📊 Performance comparison heatmaps** across all datasets and models
+- **🔬 Physics-enhanced feature analysis** for PEECOM model insights
+- **📈 Interactive dashboards** with exportable performance reports
+- **🎯 Publication-quality plots** in PDF and PNG formats
+
 ---
 
 ## 📁 Project Structure
@@ -37,6 +45,9 @@ peecom/
 ├── README.md                          # This file
 ├── dataset_preprocessing.py           # Main preprocessing pipeline
 ├── main.py                           # Entry point for training
+├── visualize_model_comparison.py     # 🎨 Model performance comparison plots
+├── generate_performance_report.py    # 📊 Comprehensive performance reports  
+├── run_all_visualizations.py         # 🚀 Batch visualization generation
 │
 ├── dataset/cmohs/                    # Raw sensor data
 │   ├── PS1.txt, PS2.txt, ...       # Pressure sensors
@@ -558,7 +569,7 @@ python main.py --dataset sensord --model random_forest --target status
 python main.py --dataset cmohs --model random_forest --eval-all
 
 # Train PEECOM on all equipment anomaly targets (3 targets)
-python main.py --dataset equipmentad --model peecom --eval-all
+ python main.py --dataset equipmentad --model peecom --eval-all
 
 # Train Logistic Regression on all energy classification targets (3 targets)
 python main.py --dataset mlclassem --model logistic_regression --eval-all
@@ -765,6 +776,40 @@ python visualize_models.py --list-models
 python visualize_models.py --list-targets
 ```
 
+#### **🎯 Model Performance Comparison Visualizations**
+
+```bash
+# Generate comprehensive model comparison plots across all datasets
+python visualize_model_comparison.py
+
+# Compare specific dataset
+python visualize_model_comparison.py --dataset cmohs
+python visualize_model_comparison.py --dataset equipmentad
+python visualize_model_comparison.py --dataset mlclassem
+
+# Generate performance reports
+python generate_performance_report.py --format markdown
+
+# Create CSV report instead
+python generate_performance_report.py --format csv --output performance_summary.csv
+
+# Generate comprehensive performance report with all visualizations
+python generate_performance_report.py --output comprehensive_report.md
+```
+
+#### **📊 Quick Visualization Commands**
+
+```bash
+# Run all visualization generation commands at once
+python run_all_visualizations.py
+
+# Generate basic model comparison for any dataset
+python visualize_model_comparison.py --dataset cmohs
+
+# Create performance summary report
+python generate_performance_report.py --format markdown
+```
+
 ### **📁 Generated Visualization Structure**
 
 Each visualization command creates organized output:
@@ -781,6 +826,41 @@ output/models/{model_name}/{target_name}/figures/
 ├── model_storage_complexity_comparison.pdf/.png          # Storage size
 └── visualization_summary.json                           # Generation summary
 ```
+
+### **📊 Model Comparison Visualization Outputs**
+
+The comprehensive comparison system generates:
+
+```
+output/figures/model_comparison/
+├── performance_comparison/
+│   ├── accuracy_heatmap_all_datasets.pdf               # Dataset × Model accuracy heatmap
+│   ├── model_ranking_by_dataset.pdf                    # Performance rankings per dataset
+│   ├── dataset_difficulty_analysis.pdf                 # Dataset complexity comparison
+│   └── performance_summary_table.csv                   # Exportable performance data
+├── complexity_analysis/
+│   ├── training_time_comparison.pdf                    # Training time across models
+│   ├── model_size_comparison.pdf                       # Storage requirements
+│   ├── feature_importance_patterns.pdf                 # Feature usage patterns
+│   └── computational_complexity_matrix.pdf             # Complexity vs Performance
+├── cross_dataset_analysis/
+│   ├── model_generalization_scores.pdf                 # Cross-dataset performance
+│   ├── dataset_similarity_matrix.pdf                   # Dataset characteristics
+│   └── optimal_model_recommendations.pdf               # Best model per scenario
+└── comprehensive_report/
+    ├── executive_summary.html                           # Interactive dashboard
+    ├── detailed_analysis_report.pdf                    # Publication-ready report
+    └── performance_metrics_export.json                 # Machine-readable results
+```
+
+### **🎨 Visualization Script Descriptions**
+
+| Script | Purpose | Key Outputs |
+|--------|---------|-------------|
+| **visualize_models.py** | Individual model analysis | Feature importance, physics analysis, single-model plots |
+| **visualize_model_comparison.py** | Cross-model performance comparison | Heatmaps, rankings, complexity analysis |
+| **generate_performance_report.py** | Comprehensive reporting | HTML dashboard, PDF reports, summary tables |
+| **run_all_visualizations.py** | Batch visualization generation | Complete visualization suite for all models |
 
 ### **🔬 PEECOM Physics Visualizations**
 
@@ -818,6 +898,18 @@ python visualize_models.py --model all --target cooler_condition
 
 # Generate everything for comprehensive analysis
 python visualize_models.py --generate-all
+
+# 🔥 NEW: Generate comprehensive model comparison visualizations
+python visualize_model_comparison.py --all-datasets --all-models
+
+# Create performance heatmaps and rankings
+python visualize_model_comparison.py --performance-analysis --save-tables
+
+# Generate complete performance report with dashboard
+python generate_performance_report.py --comprehensive
+
+# Run all visualizations in batch
+python run_all_visualizations.py
 ```
 
 ---
