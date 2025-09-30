@@ -94,9 +94,10 @@ class SimplePEECOM(BaseEstimator, ClassifierMixin):
         """Fit the Simple PEECOM model"""
 
         print("Training Simple PEECOM model (fast version)...")
-
         # Create physics features
         X_enhanced = self._create_physics_features(X)
+        # Store feature names for provenance
+        self.feature_names_ = list(X_enhanced.columns) if hasattr(X_enhanced, 'columns') else [f'f_{i}' for i in range(X_enhanced.shape[1])]
 
         # Store original feature info
         self.original_features = X.shape[1] if hasattr(
@@ -150,6 +151,15 @@ class SimplePEECOM(BaseEstimator, ClassifierMixin):
 
         # Predict probabilities
         return self.model.predict_proba(X_scaled)
+
+    def get_feature_importance(self):
+        """Return feature importances if available"""
+        if self.model is not None and hasattr(self.model, 'feature_importances_'):
+            return self.model.feature_importances_
+        return None
+
+    def get_feature_names(self):
+        return getattr(self, 'feature_names_', None)
 
     def get_feature_importance(self):
         """Get feature importance from the underlying Random Forest model"""

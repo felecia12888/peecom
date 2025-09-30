@@ -8,6 +8,8 @@ can be accessed by name.
 """
 
 from .simple_peecom import SimplePEECOM
+from .multi_classifier_peecom import MultiClassifierPEECOM
+from .enhanced_peecom import EnhancedPEECOM
 from .gradient_boosting_model import GradientBoostingModel
 from .svm_model import SVMModel
 from .logistic_regression_model import LogisticRegressionModel
@@ -79,6 +81,22 @@ class ModelLoader:
                 'suitable_for': ['hydraulic_systems', 'fast_training', 'physics_aware', 'condition_monitoring'],
                 'pros': ['Physics-informed features', 'Fast training (<30s)', 'Reliable performance', 'Simple implementation'],
                 'cons': ['Simplified physics features compared to complex versions']
+            },
+            'multi_peecom': {
+                'class': MultiClassifierPEECOM,
+                'display_name': 'Multi-Classifier PEECOM',
+                'description': 'Advanced PEECOM with automatic classifier selection based on physics feature benefits',
+                'suitable_for': ['hydraulic_systems', 'adaptive_selection', 'physics_aware', 'optimal_performance'],
+                'pros': ['Automatic classifier optimization', 'Physics-informed features', 'Adaptive selection', 'Comprehensive evaluation'],
+                'cons': ['Longer training time', 'More complex than simple PEECOM']
+            },
+            'enhanced_peecom': {
+                'class': EnhancedPEECOM,
+                'display_name': 'Enhanced PEECOM',
+                'description': 'Advanced PEECOM with sophisticated feature engineering, selection, and hyperparameter optimization',
+                'suitable_for': ['hydraulic_systems', 'high_performance', 'physics_aware', 'feature_engineering'],
+                'pros': ['Advanced feature engineering', 'Feature selection', 'Optimized hyperparameters', 'Best performance'],
+                'cons': ['Longer training time', 'More complex pipeline', 'Higher computational cost']
             }
         }
         return models

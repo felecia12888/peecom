@@ -145,7 +145,14 @@ def main():
             X, y = load_processed_data(data_path)
 
             # Prepare target
-            target = prepare_targets(y, args.target)
+            target_result = prepare_targets(y, args.target)
+            if isinstance(target_result, tuple):
+                target, mask = target_result
+                if mask is not None:
+                    # Filter X as well if we filtered the target
+                    X = X[mask]
+            else:
+                target = target_result
 
             # Train model using model loader
             model, scaler, results, model_output_dir = train_model_with_loader(
@@ -178,7 +185,7 @@ def main():
             print("="*60)
             try:
                 # Import visualization system
-                from visualize_models import PeecomVisualizationSystem
+                from src.visualization.visualize_models import PeecomVisualizationSystem
 
                 viz_system = PeecomVisualizationSystem(
                     base_output_dir='output')

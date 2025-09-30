@@ -218,8 +218,8 @@ def train_model_with_loader(X, y, model_name='random_forest', output_dir='output
         model_instance = model_loader.load_model(model_name)
 
     # Handle PEECOM model differently (it has its own preprocessing)
-    if model_name == 'peecom':
-        print("Training PEECOM model with physics-enhanced features...")
+    if model_name in ['peecom', 'multi_peecom', 'enhanced_peecom']:
+        print(f"Training {model_loader.get_model_display_name(model_name)} with physics-enhanced features...")
         # PEECOM handles its own feature engineering and scaling
         model_instance.fit(X_train, y_train)
 
