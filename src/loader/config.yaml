@@ -1,0 +1,171 @@
+# PEECOM Configuration
+# Central configuration for data loading, preprocessing, and model training
+
+# Dataset Configuration
+dataset:
+  name: cmohs
+  root_dir: dataset
+  processed_dir: output/processed_data
+
+# Preprocessing Configuration
+preprocessing:
+  # Scaling method
+  scaler: robust # Options: robust, standard, minmax, none
+
+  # BLAST preprocessing for batch effect removal
+  use_blast: false
+  blast:
+    variance_retention: 0.95
+    standardize_first: true
+
+  # Outlier detection and removal
+  remove_outliers: false
+  outlier:
+    method: iqr # Options: iqr, zscore, modified_zscore, isolation_forest
+    threshold: null # null = use method defaults
+
+  # Data leakage detection
+  check_leakage: false
+  leakage:
+    correlation_threshold: 0.95
+    mutual_info_threshold: 0.9
+
+  # Imputation
+  imputation:
+    method: iterative # Options: mean, median, iterative, none
+
+  # Feature selection
+  feature_selection:
+    enabled: false
+    method: mutual_info # Options: mutual_info, f_score, rfe
+    max_features: 120
+
+# Data Splitting
+data_split:
+  test_size: 0.2
+  val_size: 0.2
+  random_state: 42
+  stratify: true
+
+# Model Configuration
+model:
+  # Default model type
+  type: peecom # Options: peecom, peecom_base, peecom_physics, peecom_adaptive, random_forest, gradient_boosting, logistic_regression, svm
+
+  # Model hyperparameters (defaults)
+  hyperparameters:
+    n_estimators: 100
+    max_depth: null
+    min_samples_split: 2
+    min_samples_leaf: 1
+    random_state: 42
+
+  # Hyperparameter tuning
+  tune_hyperparameters: false
+  tuning:
+    method: random_search # Options: random_search, grid_search, bayesian
+    n_iter: 50
+    cv_folds: 5
+
+# Training Configuration
+training:
+  batch_size: 32
+  epochs: 100
+  learning_rate: 0.001
+  early_stopping_patience: 10
+
+  # Cross-validation
+  cross_validation:
+    enabled: true
+    n_folds: 5
+    strategy: stratified # Options: stratified, kfold, group
+    shuffle: true
+
+# Evaluation Configuration
+evaluation:
+  metrics:
+    - accuracy
+    - precision
+    - recall
+    - f1_score
+    - roc_auc
+
+  # Generate reports
+  generate_reports: true
+  save_confusion_matrix: true
+  save_feature_importance: true
+
+# Visualization Configuration
+visualization:
+  enabled: true
+  formats:
+    - png
+    - pdf
+  dpi: 300
+  style: seaborn
+
+# Output Configuration
+output:
+  base_dir: output
+  models_dir: output/models
+  figures_dir: output/figures
+  reports_dir: output/reports
+  logs_dir: output/logs
+
+  # Save intermediate results
+  save_processed_data: true
+  save_predictions: true
+
+# Logging Configuration
+logging:
+  level: INFO # Options: DEBUG, INFO, WARNING, ERROR
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+
+# Hardware/Performance Configuration
+performance:
+  use_gpu: false
+  n_jobs: -1 # -1 = use all cores
+  memory_limit: null
+
+# Sensor Specifications (for CMOHS dataset)
+sensor_specs:
+  PS: # Pressure sensors
+    count: 6
+    hz: 100
+    unit: bar
+    samples: 6000
+  EPS: # Electric power
+    count: 1
+    hz: 100
+    unit: W
+    samples: 6000
+  FS: # Flow sensors
+    count: 2
+    hz: 10
+    unit: l/min
+    samples: 600
+  TS: # Temperature sensors
+    count: 4
+    hz: 1
+    unit: °C
+    samples: 60
+  VS: # Vibration sensor
+    count: 1
+    hz: 1
+    unit: mm/s
+    samples: 60
+  CE: # Cooling efficiency
+    count: 1
+    hz: 1
+    unit: "%"
+    samples: 60
+  CP: # Cooling power
+    count: 1
+    hz: 1
+    unit: kW
+    samples: 60
+  SE: # System efficiency
+    count: 1
+    hz: 1
+    unit: "%"
+    samples: 60

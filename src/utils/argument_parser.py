@@ -86,8 +86,8 @@ Examples:
         self.parser.add_argument(
             "--config",
             type=str,
-            default="src/config/config.yaml",
-            help="Path to configuration YAML file (default: src/config/config.yaml)"
+            default="src/loader/config.yaml",
+            help="Path to configuration YAML file (default: src/loader/config.yaml)"
         )
 
         self.parser.add_argument(
@@ -152,9 +152,11 @@ Examples:
         model_group.add_argument(
             "--model_type",
             type=str,
-            default="lstm",
-            choices=["lstm", "cnn", "transformer", "hybrid"],
-            help="Model architecture type (default: lstm)"
+            default="peecom",
+            choices=["peecom", "peecom_base", "peecom_physics", "peecom_adaptive",
+                     "random_forest", "gradient_boosting", "logistic_regression",
+                     "svm", "lstm", "cnn", "transformer", "hybrid"],
+            help="Model architecture type (default: peecom)"
         )
 
         model_group.add_argument(
@@ -317,6 +319,55 @@ Examples:
             help="Enable data augmentation"
         )
 
+        # BLAST preprocessing options
+        preprocess_group.add_argument(
+            "--use_blast",
+            action="store_true",
+            help="Enable BLAST preprocessing for batch effect removal"
+        )
+
+        preprocess_group.add_argument(
+            "--blast_variance_retention",
+            type=float,
+            default=0.95,
+            help="BLAST variance retention ratio (default: 0.95)"
+        )
+
+        # Outlier removal options
+        preprocess_group.add_argument(
+            "--remove_outliers",
+            action="store_true",
+            help="Enable outlier removal"
+        )
+
+        preprocess_group.add_argument(
+            "--outlier_method",
+            type=str,
+            default="iqr",
+            choices=["iqr", "zscore", "modified_zscore", "isolation_forest"],
+            help="Outlier detection method (default: iqr)"
+        )
+
+        preprocess_group.add_argument(
+            "--outlier_threshold",
+            type=float,
+            help="Threshold for outlier detection (method-specific)"
+        )
+
+        # Leakage detection options
+        preprocess_group.add_argument(
+            "--check_leakage",
+            action="store_true",
+            help="Enable data leakage detection"
+        )
+
+        preprocess_group.add_argument(
+            "--leakage_correlation_threshold",
+            type=float,
+            default=0.95,
+            help="Correlation threshold for leakage detection (default: 0.95)"
+        )
+
         # === Analysis Arguments ===
         analysis_group = self.parser.add_argument_group(
             "Analysis Configuration")
@@ -406,32 +457,45 @@ Examples:
     def _validate_arguments(self, args: argparse.Namespace):
         """Validate parsed arguments"""
 
-        # Check if config file exists
-        if not os.path.exists(args.config):
+        # Check if config file exists (optional - use defaults if not found)
+        if args.config and not os.path.exists(args.config):
             print(
-                f"Warning: Config file {args.config} not found. Using defaults.")
+                f"Warning: Config file {args.config} not found. Using command-line args and defaults.")
 
-        # Check if dataset path exists for modes that need it
-        if args.mode in ["preprocess", "analyze", "train"] and not os.path.exists(args.dataset_path):
-            raise FileNotFoundError(
-                f"Dataset path {args.dataset_path} not found")
+        # Check if dataset path exists for modes that need it (optional for some modes)
+        if args.mode in ["preprocess", "analyze"] and hasattr(args, 'dataset_path'):
+            if not os.path.exists(args.dataset_path):
+                print(
+                    f"Warning: Dataset path {args.dataset_path} not found. Will be created if needed.")
 
-        # Check if model path exists for evaluation/prediction
-        if args.mode in ["evaluate", "predict"] and args.model_path and not os.path.exists(args.model_path):
-            raise FileNotFoundError(f"Model path {args.model_path} not found")
+        # Check if model path exists for evaluation/prediction (only if provided)
+        if args.mode in ["evaluate", "predict"] and hasattr(args, 'model_path') and args.model_path:
+            if not os.path.exists(args.model_path):
+                raise FileNotFoundError(
+                    f"Model path {args.model_path} not found")
 
-        # Validate numeric ranges
-        if args.test_size <= 0 or args.test_size >= 1:
-            raise ValueError("test_size must be between 0 and 1")
+        # Validate numeric ranges (with safe defaults)
+        if hasattr(args, 'test_size'):
+            if args.test_size <= 0 or args.test_size >= 1:
+                raise ValueError("test_size must be between 0 and 1")
 
-        if args.val_size <= 0 or args.val_size >= 1:
-            raise ValueError("val_size must be between 0 and 1")
+        if hasattr(args, 'val_size'):
+            if args.val_size <= 0 or args.val_size >= 1:
+                raise ValueError("val_size must be between 0 and 1")
 
-        if args.dropout < 0 or args.dropout >= 1:
-            raise ValueError("dropout must be between 0 and 1")
+        if hasattr(args, 'dropout'):
+            if args.dropout < 0 or args.dropout >= 1:
+                raise ValueError("dropout must be between 0 and 1")
 
-        if args.lr <= 0:
-            raise ValueError("learning_rate must be positive")
+        if hasattr(args, 'lr'):
+            if args.lr <= 0:
+                raise ValueError("learning_rate must be positive")
+
+        # Validate BLAST parameters
+        if hasattr(args, 'blast_variance_retention'):
+            if args.blast_variance_retention <= 0 or args.blast_variance_retention > 1:
+                raise ValueError(
+                    "blast_variance_retention must be between 0 and 1")
 
     def merge_with_config(self, args: argparse.Namespace, config_override: Optional[Dict] = None) -> Dict[str, Any]:
         """

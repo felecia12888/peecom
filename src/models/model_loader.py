@@ -7,13 +7,11 @@ for hydraulic system condition monitoring. All available models are registered h
 can be accessed by name.
 """
 
-from .simple_peecom import SimplePEECOM
-from .multi_classifier_peecom import MultiClassifierPEECOM
-from .enhanced_peecom import EnhancedPEECOM
-from .gradient_boosting_model import GradientBoostingModel
-from .svm_model import SVMModel
-from .logistic_regression_model import LogisticRegressionModel
-from .random_forest_model import RandomForestModel
+from .svm import SVM
+from .linear import LogisticRegression
+from .boosting import GradientBoosting
+from .forest import RandomForest
+from .peecom import PEECOM, PhysicsEnhancedPEECOM, AdaptivePEECOM
 import os
 import sys
 from typing import Dict, List, Optional, Any
@@ -24,7 +22,7 @@ src_dir = os.path.dirname(current_dir)
 if src_dir not in sys.path:
     sys.path.append(src_dir)
 
-# Import all available models
+# Import all available models from new structure
 
 
 class ModelLoader:
@@ -43,7 +41,7 @@ class ModelLoader:
         """Register all available models"""
         models = {
             'random_forest': {
-                'class': RandomForestModel,
+                'class': RandomForest,
                 'display_name': 'Random Forest',
                 'description': 'Ensemble method using multiple decision trees',
                 'suitable_for': ['multi-class', 'feature_importance', 'robust'],
@@ -51,7 +49,7 @@ class ModelLoader:
                 'cons': ['Can be slow on large datasets', 'Less interpretable']
             },
             'logistic_regression': {
-                'class': LogisticRegressionModel,
+                'class': LogisticRegression,
                 'display_name': 'Logistic Regression',
                 'description': 'Linear model for classification problems',
                 'suitable_for': ['multi-class', 'interpretable', 'fast'],
@@ -59,7 +57,7 @@ class ModelLoader:
                 'cons': ['Assumes linear relationships', 'May need feature engineering']
             },
             'svm': {
-                'class': SVMModel,
+                'class': SVM,
                 'display_name': 'Support Vector Machine',
                 'description': 'Finds optimal hyperplane for classification',
                 'suitable_for': ['multi-class', 'high_dimensional', 'robust'],
@@ -67,7 +65,7 @@ class ModelLoader:
                 'cons': ['Slow on large datasets', 'Sensitive to feature scaling']
             },
             'gradient_boosting': {
-                'class': GradientBoostingModel,
+                'class': GradientBoosting,
                 'display_name': 'Gradient Boosting',
                 'description': 'Sequential ensemble of weak learners',
                 'suitable_for': ['multi-class', 'feature_importance', 'high_accuracy'],
@@ -75,28 +73,28 @@ class ModelLoader:
                 'cons': ['Can overfit', 'Sensitive to hyperparameters', 'Longer training time']
             },
             'peecom': {
-                'class': SimplePEECOM,
-                'display_name': 'PEECOM (Simple & Fast)',
-                'description': 'Fast Physics-Enhanced Equipment Condition Monitoring with lightweight features',
-                'suitable_for': ['hydraulic_systems', 'fast_training', 'physics_aware', 'condition_monitoring'],
-                'pros': ['Physics-informed features', 'Fast training (<30s)', 'Reliable performance', 'Simple implementation'],
-                'cons': ['Simplified physics features compared to complex versions']
+                'class': PEECOM,
+                'display_name': 'PEECOM',
+                'description': 'Physics-Enhanced Equipment Condition Monitoring with physics-informed features',
+                'suitable_for': ['hydraulic_systems', 'physics_aware', 'condition_monitoring', 'fast'],
+                'pros': ['Physics-informed features', 'Fast training', 'Reliable performance', 'Feature selection'],
+                'cons': ['Requires domain knowledge for feature engineering']
             },
-            'multi_peecom': {
-                'class': MultiClassifierPEECOM,
-                'display_name': 'Multi-Classifier PEECOM',
-                'description': 'Advanced PEECOM with automatic classifier selection based on physics feature benefits',
-                'suitable_for': ['hydraulic_systems', 'adaptive_selection', 'physics_aware', 'optimal_performance'],
-                'pros': ['Automatic classifier optimization', 'Physics-informed features', 'Adaptive selection', 'Comprehensive evaluation'],
-                'cons': ['Longer training time', 'More complex than simple PEECOM']
-            },
-            'enhanced_peecom': {
-                'class': EnhancedPEECOM,
-                'display_name': 'Enhanced PEECOM',
-                'description': 'Advanced PEECOM with sophisticated feature engineering, selection, and hyperparameter optimization',
+            'physics_enhanced_peecom': {
+                'class': PhysicsEnhancedPEECOM,
+                'display_name': 'Physics-Enhanced PEECOM',
+                'description': 'Advanced PEECOM with sophisticated feature engineering and optimization',
                 'suitable_for': ['hydraulic_systems', 'high_performance', 'physics_aware', 'feature_engineering'],
-                'pros': ['Advanced feature engineering', 'Feature selection', 'Optimized hyperparameters', 'Best performance'],
+                'pros': ['Advanced physics features', 'Feature selection', 'Polynomial features', 'Best performance'],
                 'cons': ['Longer training time', 'More complex pipeline', 'Higher computational cost']
+            },
+            'adaptive_peecom': {
+                'class': AdaptivePEECOM,
+                'display_name': 'Adaptive PEECOM',
+                'description': 'PEECOM with automatic classifier selection based on physics feature benefits',
+                'suitable_for': ['hydraulic_systems', 'adaptive_selection', 'physics_aware', 'optimal_performance'],
+                'pros': ['Automatic classifier optimization', 'Physics-informed features', 'Adaptive selection'],
+                'cons': ['Longer training time', 'More complex than base PEECOM']
             }
         }
         return models
